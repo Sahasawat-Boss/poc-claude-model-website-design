@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nordveil — Infrastructure monitoring for engineering teams</title>
+<style>
+  /* ---------- Reset ---------- */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  img, svg { display: block; max-width: 100%; }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+  ul { list-style: none; }
+
+  /* ---------- Tokens ---------- */
+  :root {
+    --ink:        #0a0c10;   /* near-black ground */
+    --ink-2:      #11151c;   /* panel */
+    --ink-3:      #171d26;   /* raised panel */
+    --line:       #262e3a;   /* hairline */
+    --line-2:     #384252;
+    --fog:        #7d8899;   /* muted text */
+    --chalk:      #c9d1dc;   /* body text */
+    --white:      #f4f6f9;   /* headings */
+    --amber:      #ffb020;   /* signal amber — primary accent */
+    --lime:       #b6ff3c;   /* alert lime — secondary accent */
+    --amber-dim:  #3a2b0e;
+    --lime-dim:   #24310c;
+
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: "Helvetica Neue", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+
+    --maxw: 1240px;
+    --gut: clamp(20px, 5vw, 64px);
+    --easing: cubic-bezier(.2, .7, .2, 1);
+  }
+
+  /* ---------- Base ---------- */
+  body {
+    background: var(--ink);
+    color: var(--chalk);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding-inline: var(--gut);
+  }
+
+  .mono {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--fog);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 28px; height: 1px;
+    background: var(--amber);
+  }
+
+  h1, h2, h3 {
+    font-family: var(--sans);
+    color: var(--white);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.02;
+  }
+
+  /* Big condensed display type */
+  .display {
+    font-size: clamp(2.6rem, 8.5vw, 5.2rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    text-transform: none;
+    font-stretch: condensed;
+  }
+
+  .section-title {
+    font-size: clamp(1.7rem, 4vw, 2.9rem);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+
+  p.lead {
+    font-size: clamp(1rem, 1.6vw, 1.18rem);
+    color: var(--fog);
+    max-width: 46ch;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    --pad-y: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: var(--pad-y) 26px;
+    font-family: var(--mono);
+    font-size: .78rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    background: var(--amber);
+    color: var(--ink);
+    font-weight: 600;
+    border: 1px solid var(--amber);
+    position: relative;
+    overflow: hidden;
+    transition: color .3s var(--easing);
+  }
+  .btn .arrow {
+    display: inline-block;
+    transition: transform .35s var(--easing);
+  }
+  .btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform: translateX(-101%);
+    transition: transform .38s var(--easing);
+    z-index: 0;
+  }
+  .btn > * { position: relative; z-index: 1; }
+  .btn:hover { color: var(--amber); }
+  .btn:hover::after { transform: translateX(0); }
+  .btn:hover .arrow { transform: translateX(5px); }
+  .btn:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+
+  .btn--ghost {
+    background: transparent;
+    color: var(--white);
+    border-color: var(--line-2);
+  }
+  .btn--ghost::after { background: var(--white); }
+  .btn--ghost:hover { color: var(--ink); }
+
+  /* ================================================================
+     NAV
+     ================================================================ */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: color-mix(in srgb, var(--ink) 86%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    transition: border-color .3s, background .3s;
+  }
+  .nav.is-scrolled {
+    background: color-mix(in srgb, var(--ink) 96%, transparent);
+    border-color: var(--line-2);
+  }
+  .nav__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-family: var(--mono);
+    font-size: .95rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--white);
+    font-weight: 600;
+  }
+  .brand__mark {
+    width: 22px; height: 22px;
+    flex: none;
+  }
+  .nav__links {
+    display: flex;
+    align-items: center;
+    gap: 34px;
+  }
+  .nav__links a {
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--fog);
+    position: relative;
+    padding: 6px 0;
+    transition: color .25s;
+  }
+  .nav__links a::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 100%; height: 1px;
+    background: var(--amber);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform .3s var(--easing);
+  }
+  .nav__links a:hover { color: var(--white); }
+  .nav__links a:hover::after { transform: scaleX(1); transform-origin: left; }
+
+  .nav__cta { display: inline-flex; }
+
+  .burger {
+    display: none;
+    width: 42px; height: 42px;
+    border: 1px solid var(--line-2);
+    position: relative;
+  }
+  .burger span,
+  .burger span::before,
+  .burger span::after {
+    content: "";
+    position: absolute;
+    width: 18px; height: 1.5px;
+    background: var(--white);
+    left: 50%;
+    transform: translateX(-50%);
+    transition: transform .3s var(--easing), opacity .2s;
+  }
+  .burger span { top: 50%; margin-top: -0.75px; }
+  .burger span::before { top: -6px; }
+  .burger span::after  { top: 6px; }
+  .burger.is-open span { background: transparent; }
+  .burger.is-open span::before { transform: translateX(-50%) rotate(45deg); top: 0; }
+  .burger.is-open span::after  { transform: translateX(-50%) rotate(-45deg); top: 0; }
+
+  .mobile-menu {
+    position: fixed;
+    inset: 68px 0 auto 0;
+    background: var(--ink-2);
+    border-bottom: 1px solid var(--line-2);
+    transform: translateY(-115%);
+    transition: transform .4s var(--easing);
+    z-index: 90;
+    padding: 18px var(--gut) 30px;
+  }
+  .mobile-menu.is-open { transform: translateY(0); }
+  .mobile-menu a {
+    display: block;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: .9rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--chalk);
+  }
+  .mobile-menu .btn { width: 100%; justify-content: center; margin-top: 22px; }
+
+  /* ================================================================
+     HERO — asymmetric, left-aligned, schematic grid
+     ================================================================ */
+  .hero {
+    position: relative;
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+  }
+  /* faint schematic grid behind everything */
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 88px 88px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, #000 25%, transparent 78%);
+            mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, #000 25%, transparent 78%);
+    opacity: .5;
+    pointer-events: none;
+  }
+  .hero__grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: clamp(24px, 4vw, 60px);
+    align-items: center;
+    padding-block: clamp(64px, 11vw, 128px);
+  }
+  .hero__copy { max-width: 640px; }
+  .hero .display { margin: 22px 0 24px; }
+  .hero .display em {
+    font-style: normal;
+    color: var(--amber);
+    position: relative;
+  }
+  .hero .display em::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: 6px;
+    width: 100%; height: 3px;
+    background: var(--lime);
+  }
+  .hero__actions {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-top: 34px;
+    flex-wrap: wrap;
+  }
+  .hero__note {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--fog);
+  }
+  .hero__note b { color: var(--lime); font-weight: 600; }
+
+  /* Instrument panel — live sparkline */
+  .panel {
+    background: var(--ink-2);
+    border: 1px solid var(--line-2);
+    position: relative;
+  }
+  .panel__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .panel__bar .mono { font-size: .64rem; }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--lime) 70%, transparent);
+    animation: pulse 2.4s var(--easing) infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lime) 60%, transparent); }
+    70%  { box-shadow: 0 0 0 9px color-mix(in srgb, var(--lime) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lime) 0%, transparent); }
+  }
+  .panel__chart {
+    padding: 18px 16px 8px;
+  }
+  .panel__chart svg { width: 100%; height: 118px; overflow: visible; }
+  .panel__readout {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-top: 1px solid var(--line);
+  }
+  .panel__readout div {
+    padding: 14px 16px;
+    border-right: 1px solid var(--line);
+  }
+  .panel__readout div:last-child { border-right: none; }
+  .panel__readout .k { font-family: var(--mono); font-size: .58rem; letter-spacing: .14em; text-transform: uppercase; color: var(--fog); }
+  .panel__readout .v { font-family: var(--mono); font-size: 1.15rem; color: var(--white); margin-top: 3px; font-weight: 600; }
+  .panel__readout .v.amber { color: var(--amber); }
+
+  /* corner ticks on panel */
+  .panel::before, .panel::after {
+    content: "";
+    position: absolute;
+    width: 9px; height: 9px;
+    border: 1px solid var(--amber);
+  }
+  .panel::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .panel::after  { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  /* ================================================================
+     SOCIAL PROOF — metric strip + wordmarks
+     ================================================================ */
+  .proof {
+    border-bottom: 1px solid var(--line);
+    background: var(--ink-2);
+  }
+  .proof__metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .proof__metrics div {
+    padding: clamp(28px, 4vw, 46px) clamp(16px, 2.5vw, 32px);
+    border-right: 1px solid var(--line);
+  }
+  .proof__metrics div:last-child { border-right: none; }
+  .metric__num {
+    font-family: var(--sans);
+    font-size: clamp(1.8rem, 3.6vw, 2.8rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--white);
+    line-height: 1;
+  }
+  .metric__num .unit { color: var(--amber); }
+  .metric__label {
+    font-family: var(--mono);
+    font-size: .66rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--fog);
+    margin-top: 10px;
+  }
+  .proof__logos {
+    display: flex;
+    align-items: center;
+    gap: clamp(28px, 5vw, 64px);
+    flex-wrap: wrap;
+    padding: 26px 0;
+    border-top: 1px solid var(--line);
+  }
+  .proof__logos .mono { font-size: .62rem; flex: none; }
+  .wordmark {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+    color: var(--fog);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: color .25s;
+    opacity: .8;
+  }
+  .wordmark:hover { color: var(--white); opacity: 1; }
+  .wordmark svg { width: 18px; height: 18px; }
+
+  /* ================================================================
+     GENERIC SECTION SHELL
+     ================================================================ */
+  .section { padding-block: clamp(72px, 11vw, 132px); border-bottom: 1px solid var(--line); }
+  .section__head {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: clamp(20px, 4vw, 60px);
+    align-items: end;
+    margin-bottom: clamp(44px, 7vw, 78px);
+  }
+  .section__head p { color: var(--fog); max-width: 52ch; }
+
+  /* ================================================================
+     FEATURES — asymmetric offset rows, numbered
+     ================================================================ */
+  .features { display: grid; gap: 0; }
+  .feature {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 5fr) minmax(0, 6fr);
+    gap: clamp(16px, 3vw, 44px);
+    padding-block: clamp(34px, 5vw, 56px);
+    border-top: 1px solid var(--line);
+    align-items: start;
+    position: relative;
+  }
+  .feature:last-child { border-bottom: 1px solid var(--line); }
+  .feature__idx {
+    font-family: var(--mono);
+    font-size: .8rem;
+    color: var(--amber);
+    letter-spacing: .1em;
+    padding-top: 6px;
+  }
+  .feature__title { font-size: clamp(1.3rem, 2.4vw, 1.85rem); letter-spacing: -0.02em; }
+  .feature__body { color: var(--fog); }
+  .feature__body p + p { margin-top: 14px; }
+  .feature__tags {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 20px;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--chalk);
+    border: 1px solid var(--line-2);
+    padding: 5px 10px;
+  }
+  /* hover: whole row shifts + amber rail appears */
+  .feature::before {
+    content: "";
+    position: absolute;
+    left: calc(var(--gut) * -1);
+    top: -1px;
+    width: 3px; height: calc(100% + 1px);
+    background: var(--amber);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform .4s var(--easing);
+  }
+  .feature { transition: background .3s var(--easing); }
+  .feature:hover { background: var(--ink-2); }
+  .feature:hover::before { transform: scaleY(1); }
+  .feature:hover .feature__idx { color: var(--lime); }
+  .feature__viz { grid-column: 2 / -1; margin-top: 8px; display: none; }
+
+  /* ================================================================
+     HOW IT WORKS — horizontal stepped track
+     ================================================================ */
+  .how { background: var(--ink-2); }
+  .how__track {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--line-2);
+  }
+  .step {
+    padding: clamp(24px, 3vw, 36px);
+    border-right: 1px solid var(--line);
+    position: relative;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    transition: background .3s var(--easing);
+  }
+  .step:last-child { border-right: none; }
+  .step:hover { background: var(--ink-3); }
+  .step__num {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .14em;
+    color: var(--fog);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .step__num::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+  .step__dot {
+    width: 10px; height: 10px;
+    border: 1px solid var(--amber);
+    flex: none;
+    transition: background .3s var(--easing);
+  }
+  .step:hover .step__dot { background: var(--amber); }
+  .step h3 { font-size: 1.2rem; margin-bottom: 12px; }
+  .step p { color: var(--fog); font-size: .95rem; }
+  .step__code {
+    margin-top: auto;
+    padding-top: 20px;
+    font-family: var(--mono);
+    font-size: .72rem;
+    color: var(--lime);
+    letter-spacing: .02em;
+  }
+  .step__code::before { content: "$ "; color: var(--fog); }
+
+  /* ================================================================
+     PRICING — 3 tier, left rail emphasis, no floating cards
+     ================================================================ */
+  .pricing__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--line-2);
+  }
+  .tier {
+    padding: clamp(26px, 3.4vw, 44px);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: background .3s var(--easing);
+  }
+  .tier:last-child { border-right: none; }
+  .tier:hover { background: var(--ink-2); }
+  .tier--mid {
+    background: var(--ink-2);
+    outline: 1px solid var(--amber);
+    outline-offset: -1px;
+  }
+  .tier--mid::before {
+    content: "Most deployed";
+    position: absolute;
+    top: 0; right: 0;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: .58rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 6px 12px;
+  }
+  .tier__name {
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .tier__price {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: clamp(2.2rem, 4vw, 3.1rem);
+    letter-spacing: -0.03em;
+    color: var(--white);
+    line-height: 1;
+    margin: 20px 0 4px;
+  }
+  .tier__price .per {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .08em;
+    color: var(--fog);
+    font-weight: 400;
+    text-transform: uppercase;
+  }
+  .tier__meta { color: var(--fog); font-size: .9rem; min-height: 42px; }
+  .tier__list { margin: 26px 0 30px; display: grid; gap: 12px; }
+  .tier__list li {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 10px;
+    font-size: .92rem;
+    color: var(--chalk);
+    align-items: start;
+  }
+  .tier__list li::before {
+    content: "";
+    width: 8px; height: 8px;
+    margin-top: 7px;
+    background: var(--lime);
+  }
+  .tier__list li.off { color: var(--fog); }
+  .tier__list li.off::before { background: var(--line-2); }
+  .tier .btn { margin-top: auto; width: 100%; justify-content: center; }
+  .tier--mid .btn { background: var(--amber); }
+  .tier:not(.tier--mid) .btn {
+    background: transparent;
+    color: var(--white);
+    border-color: var(--line-2);
+  }
+  .tier:not(.tier--mid) .btn::after { background: var(--white); }
+  .tier:not(.tier--mid) .btn:hover { color: var(--ink); }
+
+  /* ================================================================
+     FOOTER
+     ================================================================ */
+  .footer { background: var(--ink-2); padding-block: clamp(56px, 8vw, 92px); }
+  .footer__top {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) repeat(3, minmax(0, 2fr));
+    gap: clamp(24px, 4vw, 48px);
+    padding-bottom: 48px;
+    border-bottom: 1px solid var(--line);
+  }
+  .footer__brand .brand { margin-bottom: 16px; }
+  .footer__brand p { color: var(--fog); font-size: .9rem; max-width: 34ch; }
+  .footer__col h4 {
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--fog);
+    margin-bottom: 18px;
+  }
+  .footer__col a {
+    display: block;
+    padding: 7px 0;
+    color: var(--chalk);
+    font-size: .92rem;
+    transition: color .2s, padding-left .25s var(--easing);
+  }
+  .footer__col a:hover { color: var(--amber); padding-left: 8px; }
+  .footer__bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 30px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .footer__bottom .mono { font-size: .64rem; }
+  .footer__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--fog);
+  }
+
+  /* ================================================================
+     REVEAL ANIMATION
+     ================================================================ */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity .7s var(--easing), transform .7s var(--easing);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .dot { animation: none; }
+    * { scroll-behavior: auto; }
+  }
+
+  /* ================================================================
+     RESPONSIVE
+     ================================================================ */
+  @media (max-width: 1000px) {
+    .hero__grid { grid-template-columns: 1fr; }
+    .panel { max-width: 480px; }
+    .section__head { grid-template-columns: 1fr; }
+    .proof__metrics { grid-template-columns: repeat(2, 1fr); }
+    .proof__metrics div:nth-child(2) { border-right: none; }
+    .proof__metrics div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .how__track { grid-template-columns: repeat(2, 1fr); }
+    .step:nth-child(2) { border-right: none; }
+    .step:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .footer__top { grid-template-columns: 1fr 1fr; }
+    .footer__brand { grid-column: 1 / -1; }
+  }
+
+  @media (max-width: 720px) {
+    .nav__links, .nav__cta { display: none; }
+    .burger { display: block; }
+    .feature { grid-template-columns: 44px 1fr; }
+    .feature__body { grid-column: 1 / -1; margin-top: 8px; }
+    .pricing__grid { grid-template-columns: 1fr; }
+    .tier { border-right: none; border-bottom: 1px solid var(--line); }
+    .tier:last-child { border-bottom: none; }
+    .how__track { grid-template-columns: 1fr; }
+    .step { border-right: none; border-bottom: 1px solid var(--line); min-height: auto; }
+    .step:last-child { border-bottom: none; }
+    .proof__metrics { grid-template-columns: 1fr; }
+    .proof__metrics div { border-right: none; border-bottom: 1px solid var(--line); }
+    .proof__metrics div:last-child { border-bottom: none; }
+  }
+
+  @media (max-width: 460px) {
+    .hero__actions { flex-direction: column; align-items: stretch; }
+    .hero__actions .btn { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav" id="nav">
+  <div class="wrap nav__inner">
+    <a href="#top" class="brand" aria-label="Nordveil home">
+      <svg class="brand__mark" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="20" height="20" stroke="#ffb020" stroke-width="1.5"/>
+        <path d="M4 15 L9 6 L13 13 L18 4" stroke="#b6ff3c" stroke-width="1.5" fill="none"/>
+        <circle cx="9" cy="6" r="1.6" fill="#ffb020"/>
+      </svg>
+      Nordveil
+    </a>
+
+    <nav class="nav__links" aria-label="Primary">
+      <a href="#features">Platform</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#footer">Docs</a>
+    </nav>
+
+    <a href="#pricing" class="btn nav__cta">
+      <span>Start trial</span><span class="arrow" aria-hidden="true">→</span>
+    </a>
+
+    <button class="burger" id="burger" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu">
+      <span></span>
+    </button>
+  </div>
+</header>
+
+<nav class="mobile-menu" id="mobileMenu" aria-label="Mobile">
+  <a href="#features">Platform</a>
+  <a href="#how">How it works</a>
+  <a href="#pricing">Pricing</a>
+  <a href="#footer">Docs</a>
+  <a href="#pricing" class="btn"><span>Start trial</span><span class="arrow" aria-hidden="true">→</span></a>
+</nav>
+
+<main id="top">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="wrap hero__grid">
+      <div class="hero__copy">
+        <span class="eyebrow">Infrastructure monitoring</span>
+        <h1 class="display">
+          See the failure<br><em>before</em> the pager does.
+        </h1>
+        <p class="lead">
+          Nordveil correlates metrics, traces, and deploy events across your stack into
+          one signal — so a 15-person team gets the coverage of a dedicated SRE org.
+        </p>
+        <div class="hero__actions">
+          <a href="#pricing" class="btn">
+            <span>Deploy in 4 minutes</span><span class="arrow" aria-hidden="true">→</span>
+          </a>
+          <span class="hero__note">No card · <b>14-day</b> full access</span>
+        </div>
+      </div>
+
+      <!-- Instrument panel with live sparkline -->
+      <aside class="panel" aria-label="Live latency sample">
+        <div class="panel__bar">
+          <span class="mono">svc/api-gateway · p95</span>
+          <span class="dot" aria-hidden="true"></span>
+        </div>
+        <div class="panel__chart">
+          <svg id="spark" viewBox="0 0 320 118" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ffb020" stop-opacity="0.28"/>
+                <stop offset="1" stop-color="#ffb020" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="30" x2="320" y2="30" stroke="#262e3a" stroke-width="1" stroke-dasharray="2 4"/>
+            <line x1="0" y1="74" x2="320" y2="74" stroke="#262e3a" stroke-width="1" stroke-dasharray="2 4"/>
+            <path id="sparkFill" fill="url(#fill)" d=""/>
+            <path id="sparkLine" fill="none" stroke="#ffb020" stroke-width="2" stroke-linejoin="round" d=""/>
+            <circle id="sparkHead" r="3" fill="#b6ff3c"/>
+          </svg>
+        </div>
+        <div class="panel__readout">
+          <div><div class="k">p95</div><div class="v amber" id="rP95">— ms</div></div>
+          <div><div class="k">error rate</div><div class="v" id="rErr">0.00%</div></div>
+          <div><div class="k">hosts</div><div class="v" id="rHosts">142</div></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ SOCIAL PROOF ============ -->
+  <section class="proof">
+    <div class="proof__metrics">
+      <div class="reveal">
+        <div class="metric__num" data-count="63" data-suffix="%">0<span class="unit">%</span></div>
+        <div class="metric__label">Fewer false alerts</div>
+      </div>
+      <div class="reveal">
+        <div class="metric__num" data-count="4" data-suffix="min">0<span class="unit">min</span></div>
+        <div class="metric__label">Median time to deploy</div>
+      </div>
+      <div class="reveal">
+        <div class="metric__num" data-count="2.1" data-suffix="s" data-decimals="1">0<span class="unit">s</span></div>
+        <div class="metric__label">Metric ingest lag</div>
+      </div>
+      <div class="reveal">
+        <div class="metric__num" data-count="380" data-suffix="+">0<span class="unit">+</span></div>
+        <div class="metric__label">Engineering teams</div>
+      </div>
+    </div>
+    <div class="wrap proof__logos">
+      <span class="mono">Trusted by teams at</span>
+      <span class="wordmark"><svg viewBox="0 0 18 18" fill="none"><rect x="1" y="1" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="3" fill="currentColor"/></svg>Halden</span>
+      <span class="wordmark"><svg viewBox="0 0 18 18" fill="none"><path d="M9 1 L17 15 H1 Z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>Brecca</span>
+      <span class="wordmark"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M4 9 H14" stroke="currentColor" stroke-width="1.5"/></svg>Otava</span>
+      <span class="wordmark"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="6" height="6" fill="currentColor"/><rect x="10" y="10" width="6" height="6" fill="currentColor"/><rect x="10" y="2" width="6" height="6" stroke="currentColor" stroke-width="1.5"/></svg>Skarn</span>
+      <span class="wordmark"><svg viewBox="0 0 18 18" fill="none"><path d="M2 16 L9 2 L16 16" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 16 L9 8 L13 16" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>Vellum</span>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section__head">
+        <div>
+          <span class="eyebrow">The platform</span>
+          <h2 class="section-title" style="margin-top:16px">One layer<br>over everything you run.</h2>
+        </div>
+        <p>
+          Most tools give you dashboards. Nordveil gives you a verdict — the specific
+          service, the specific deploy, the blast radius — computed the moment a signal
+          drifts. Built for teams without a platform division.
+        </p>
+      </div>
+
+      <div class="features">
+
+        <article class="feature">
+          <div class="feature__idx">[ 01 ]</div>
+          <h3 class="feature__title">Deploy-aware correlation</h3>
+          <div class="feature__body">
+            <p>Every metric anomaly is automatically checked against your deploy timeline.
+            If latency climbed 40 seconds after a ship, that commit is named in the alert —
+            not left for you to bisect at 3&nbsp;a.m.</p>
+            <div class="feature__tags">
+              <span class="tag">git integration</span>
+              <span class="tag">rollback hints</span>
+              <span class="tag">change intelligence</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature__idx">[ 02 ]</div>
+          <h3 class="feature__title">Alerts that earn the interrupt</h3>
+          <div class="feature__body">
+            <p>Adaptive baselines learn each service's normal shape per hour and per weekday.
+            Seasonal traffic stops paging you. Real regressions still do — with a confidence
+            score and the three most-correlated signals attached.</p>
+            <div class="feature__tags">
+              <span class="tag">anomaly scoring</span>
+              <span class="tag">noise budget</span>
+              <span class="tag">pagerduty · slack</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature__idx">[ 03 ]</div>
+          <h3 class="feature__title">Traces without the sampling tax</h3>
+          <div class="feature__body">
+            <p>Tail-based sampling keeps 100% of slow and errored requests and a smart slice
+            of the rest. You get the outlier trace that actually explains the incident, at a
+            fraction of the storage bill.</p>
+            <div class="feature__tags">
+              <span class="tag">opentelemetry</span>
+              <span class="tag">tail sampling</span>
+              <span class="tag">30-day retention</span>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="section how" id="how">
+    <div class="wrap">
+      <div class="section__head">
+        <div>
+          <span class="eyebrow">How it works</span>
+          <h2 class="section-title" style="margin-top:16px">From zero to<br>correlated in one afternoon.</h2>
+        </div>
+        <p>
+          No agent fleet to manage, no query language to learn before you get value.
+          Point Nordveil at your telemetry and it starts building the model.
+        </p>
+      </div>
+
+      <div class="how__track">
+        <div class="step reveal">
+          <div class="step__num"><span class="step__dot"></span> Step 01</div>
+          <h3>Send telemetry</h3>
+          <p>Drop in the OpenTelemetry endpoint or install the single collector. Prometheus and StatsD scrape targets work unchanged.</p>
+          <div class="step__code">nordveil connect --otlp</div>
+        </div>
+        <div class="step reveal">
+          <div class="step__num"><span class="step__dot"></span> Step 02</div>
+          <h3>Link your repo</h3>
+          <p>Authorize the GitHub or GitLab app. Deploy markers and commit metadata flow in automatically from CI.</p>
+          <div class="step__code">nordveil link github</div>
+        </div>
+        <div class="step reveal">
+          <div class="step__num"><span class="step__dot"></span> Step 03</div>
+          <h3>Baselines build</h3>
+          <p>Within ~6 hours the model has learned each service's rhythm. Alerts stay muted until baselines are confident.</p>
+          <div class="step__code">nordveil status --baselines</div>
+        </div>
+        <div class="step reveal">
+          <div class="step__num"><span class="step__dot"></span> Step 04</div>
+          <h3>Get the verdict</h3>
+          <p>When something drifts, you get one notification naming the service, the likely cause, and the blast radius.</p>
+          <div class="step__code">nordveil incidents --open</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICING ============ -->
+  <section class="section" id="pricing">
+    <div class="wrap">
+      <div class="section__head">
+        <div>
+          <span class="eyebrow">Pricing</span>
+          <h2 class="section-title" style="margin-top:16px">Priced per host,<br>not per surprise.</h2>
+        </div>
+        <p>
+          Flat host-based pricing with every feature in every tier. Metrics, traces, and
+          deploy correlation are never an upsell. Annual billing shown; monthly available.
+        </p>
+      </div>
+
+      <div class="pricing__grid">
+
+        <div class="tier">
+          <div class="tier__name">Signal</div>
+          <div class="tier__price">$12<span class="per"> / host / mo</span></div>
+          <p class="tier__meta">For small teams putting monitoring on a real footing.</p>
+          <ul class="tier__list">
+            <li>Metrics + adaptive alerting</li>
+            <li>7-day trace retention</li>
+            <li>Deploy correlation</li>
+            <li>3 integrations</li>
+            <li class="off">SSO &amp; audit log</li>
+            <li class="off">Dedicated onboarding</li>
+          </ul>
+          <a href="#" class="btn"><span>Start free trial</span><span class="arrow" aria-hidden="true">→</span></a>
+        </div>
+
+        <div class="tier tier--mid">
+          <div class="tier__name">Correlate</div>
+          <div class="tier__price">$26<span class="per"> / host / mo</span></div>
+          <p class="tier__meta">The default for mid-size engineering orgs running production.</p>
+          <ul class="tier__list">
+            <li>Everything in Signal</li>
+            <li>30-day trace retention</li>
+            <li>Confidence scoring + blast radius</li>
+            <li>Unlimited integrations</li>
+            <li>SSO &amp; audit log</li>
+            <li class="off">Dedicated onboarding</li>
+          </ul>
+          <a href="#" class="btn"><span>Start free trial</span><span class="arrow" aria-hidden="true">→</span></a>
+        </div>
+
+        <div class="tier">
+          <div class="tier__name">Operate</div>
+          <div class="tier__price">Custom</div>
+          <p class="tier__meta">For teams with compliance load and 500+ hosts.</p>
+          <ul class="tier__list">
+            <li>Everything in Correlate</li>
+            <li>Custom retention &amp; residency</li>
+            <li>Private cloud / BYOC</li>
+            <li>SLA + named engineer</li>
+            <li>SSO, SCIM, audit log</li>
+            <li>Dedicated onboarding</li>
+          </ul>
+          <a href="#" class="btn"><span>Talk to engineering</span><span class="arrow" aria-hidden="true">→</span></a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer" id="footer">
+  <div class="wrap">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <a href="#top" class="brand">
+          <svg class="brand__mark" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+            <rect x="1" y="1" width="20" height="20" stroke="#ffb020" stroke-width="1.5"/>
+            <path d="M4 15 L9 6 L13 13 L18 4" stroke="#b6ff3c" stroke-width="1.5" fill="none"/>
+            <circle cx="9" cy="6" r="1.6" fill="#ffb020"/>
+          </svg>
+          Nordveil
+        </a>
+        <p>Infrastructure monitoring that names the cause. Built in Oslo for engineering teams that don't have an SRE org yet.</p>
+      </div>
+      <div class="footer__col">
+        <h4>Product</h4>
+        <a href="#features">Platform</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#">Changelog</a>
+      </div>
+      <div class="footer__col">
+        <h4>Developers</h4>
+        <a href="#">Documentation</a>
+        <a href="#">OpenTelemetry setup</a>
+        <a href="#">API reference</a>
+        <a href="#">Status</a>
+      </div>
+      <div class="footer__col">
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Security</a>
+        <a href="#">Careers</a>
+        <a href="#">Contact</a>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span class="mono">© 2026 Nordveil AS · Org 921 448 073</span>
+      <span class="footer__status"><span class="dot" aria-hidden="true"></span> All systems operational</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- Mobile menu ---------- */
+  var burger = document.getElementById("burger");
+  var menu = document.getElementById("mobileMenu");
+  function closeMenu() {
+    burger.classList.remove("is-open");
+    menu.classList.remove("is-open");
+    burger.setAttribute("aria-expanded", "false");
+  }
+  burger.addEventListener("click", function () {
+    var open = burger.classList.toggle("is-open");
+    menu.classList.toggle("is-open", open);
+    burger.setAttribute("aria-expanded", String(open));
+  });
+  menu.querySelectorAll("a").forEach(function (a) {
+    a.addEventListener("click", closeMenu);
+  });
+
+  /* ---------- Nav scroll state ---------- */
+  var nav = document.getElementById("nav");
+  var onScroll = function () {
+    nav.classList.toggle("is-scrolled", window.scrollY > 12);
+  };
+  onScroll();
+  window.addEventListener("scroll", onScroll, { passive: true });
+
+  /* ---------- Reveal on scroll ---------- */
+  if ("IntersectionObserver" in window && !reduceMotion) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.classList.add("in");
+          if (e.target.hasAttribute("data-count")) runCount(e.target);
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.35 });
+    document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+    document.querySelectorAll("[data-count]").forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
+    document.querySelectorAll("[data-count]").forEach(function (el) {
+      el.firstChild.textContent = el.getAttribute("data-count");
+    });
+  }
+
+  /* ---------- Count-up ---------- */
+  function runCount(el) {
+    var target = parseFloat(el.getAttribute("data-count"));
+    var decimals = parseInt(el.getAttribute("data-decimals") || "0", 10);
+    var dur = 1100, start = performance.now();
+    function frame(now) {
+      var t = Math.min((now - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - t, 3);
+      var val = (target * eased).toFixed(decimals);
+      el.firstChild.textContent = val;
+      if (t < 1) requestAnimationFrame(frame);
+      else el.firstChild.textContent = target.toFixed(decimals);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- Live sparkline (hero instrument panel) ---------- */
+  var line = document.getElementById("sparkLine");
+  var fill = document.getElementById("sparkFill");
+  var head = document.getElementById("sparkHead");
+  var rP95 = document.getElementById("rP95");
+  var rErr = document.getElementById("rErr");
+  if (line && fill && head) {
+    var W = 320, H = 118, N = 44;
+    var data = [];
+    for (var i = 0; i < N; i++) data.push(38 + Math.random() * 14);
+
+    function build() {
+      var min = Math.min.apply(null, data), max = Math.max.apply(null, data);
+      var range = Math.max(max - min, 1);
+      var pts = data.map(function (v, idx) {
+        var x = (idx / (N - 1)) * W;
+        var y = H - 10 - ((v - min) / range) * (H - 26);
+        return [x, y];
+      });
+      var d = pts.map(function (p, idx) {
+        return (idx === 0 ? "M" : "L") + p[0].toFixed(1) + " " + p[1].toFixed(1);
+      }).join(" ");
+      line.setAttribute("d", d);
+      fill.setAttribute("d", d + " L" + W + " " + H + " L0 " + H + " Z");
+      var last = pts[pts.length - 1];
+      head.setAttribute("cx", last[0]);
+      head.setAttribute("cy", last[1]);
+
+      var latest = data[data.length - 1];
+      rP95.textContent = Math.round(latest) + " ms";
+      var errVal = Math.max(0, (latest - 44) * 0.012);
+      rErr.textContent = errVal.toFixed(2) + "%";
+      rErr.style.color = errVal > 0.15 ? "#ffb020" : "#f4f6f9";
+    }
+    build();
+
+    if (!reduceMotion) {
+      setInterval(function () {
+        if (document.hidden) return;
+        var prev = data[data.length - 1];
+        var next = prev + (Math.random() - 0.48) * 7;
+        // occasional spike
+        if (Math.random() < 0.06) next += 12 + Math.random() * 16;
+        next = Math.max(30, Math.min(92, next));
+        data.push(next);
+        data.shift();
+        build();
+      }, 1400);
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
