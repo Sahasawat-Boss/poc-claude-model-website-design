@@ -9,7 +9,9 @@ export default function Home() {
           Nordveil landing page — model comparison
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-neutral-400">
-          โจทย์เดียวกันจาก <code className="text-neutral-300">Ref/brief.md</code>{" "}
+          <Link href="/brief" className="text-neutral-100 underline underline-offset-4">
+            โจทย์เดียวกัน
+          </Link>{" "}
           ส่งให้ Claude 2 รุ่น × 4 ระดับ reasoning effort. เลือกการ์ดเพื่อเปิดดูเต็มจอ
           หรือไปที่หน้า{" "}
           <Link href="/compare" className="text-neutral-100 underline underline-offset-4">

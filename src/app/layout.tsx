@@ -28,6 +28,9 @@ export default function RootLayout({
               <Link className="transition hover:text-neutral-100" href="/compare">
                 Compare
               </Link>
+              <Link className="transition hover:text-neutral-100" href="/brief">
+                โจทย์
+              </Link>
             </nav>
           </div>
         </header>

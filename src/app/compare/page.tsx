@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { RESULTS, type Result } from "@/lib/results";
 
@@ -60,12 +61,18 @@ export default function ComparePage() {
     <main className="flex h-[calc(100vh-53px)] flex-col">
       <div className="flex items-center gap-3 border-b border-neutral-800 px-4 py-2">
         <h1 className="text-sm font-semibold">Side-by-side compare</h1>
+        <Link
+          href="/brief"
+          className="ml-auto rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-300 transition hover:border-neutral-500 hover:text-neutral-100"
+        >
+          ดูโจทย์
+        </Link>
         <button
           onClick={() => {
             setLeft(right);
             setRight(left);
           }}
-          className="ml-auto rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-300 transition hover:border-neutral-500 hover:text-neutral-100"
+          className="rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-300 transition hover:border-neutral-500 hover:text-neutral-100"
         >
           ⇄ สลับซ้าย-ขวา
         </button>
