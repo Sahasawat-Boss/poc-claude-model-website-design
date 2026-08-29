@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nordveil — Infrastructure monitoring for engineering teams</title>
+<style>
+  /* ============================================================
+     NORDVEIL — single-file landing page
+     Design language: "control room" — near-black ink, signal amber,
+     cool slate. Visible hairline grid as the signature element.
+     ============================================================ */
+
+  :root {
+    --ink:        #0c0e10;   /* near-black background */
+    --ink-2:      #14181b;   /* raised surface */
+    --ink-3:      #1c2226;   /* card / border-lit surface */
+    --line:       #262d32;   /* hairline grid */
+    --line-soft:  #1b2125;
+    --slate:      #8a97a0;   /* cool neutral text */
+    --slate-dim:  #5c666d;
+    --chalk:      #e8ebec;   /* primary text */
+    --white:      #fbfcfc;
+    --amber:      #ffb228;   /* signal / accent */
+    --amber-deep: #d98a00;
+    --amber-glow: rgba(255, 178, 40, 0.22);
+    --mint:       #4fd1b5;   /* secondary signal, used sparingly */
+    --alert:      #ff5a45;
+
+    --maxw: 1240px;
+    --gutter: clamp(20px, 5vw, 72px);
+    --grid-unit: 88px;
+
+    --mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", "Menlo",
+            "Consolas", monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+            "Helvetica Neue", Arial, sans-serif;
+
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--ink);
+    color: var(--chalk);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.6;
+    letter-spacing: -0.006em;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection { background: var(--amber); color: var(--ink); }
+
+  a { color: inherit; text-decoration: none; }
+  img, svg { display: block; }
+
+  /* ---------- global hairline grid overlay ---------- */
+  .grid-field {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: var(--grid-unit) var(--grid-unit);
+    background-position: center top;
+    mask-image: linear-gradient(to bottom,
+      rgba(0,0,0,0.9), rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.12));
+    -webkit-mask-image: linear-gradient(to bottom,
+      rgba(0,0,0,0.9), rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.12));
+  }
+
+  /* content sits above the field */
+  .layer { position: relative; z-index: 1; }
+
+  /* ---------- shared layout ---------- */
+  .wrap {
+    max-width: var(--maxw);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  section { position: relative; z-index: 1; }
+
+  /* section coordinate marker: "01 / OVERVIEW" */
+  .marker {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 34px;
+  }
+  .marker::before {
+    content: "";
+    width: 34px;
+    height: 1px;
+    background: var(--amber);
+  }
+  .marker b {
+    color: var(--amber);
+    font-weight: 500;
+  }
+
+  /* ---------- typography scale ---------- */
+  h1, h2, h3 {
+    font-weight: 560;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+  }
+
+  .display {
+    font-size: clamp(2.9rem, 7.2vw, 5.6rem);
+    font-weight: 580;
+    letter-spacing: -0.042em;
+    line-height: 0.98;
+  }
+
+  h2.section-title {
+    font-size: clamp(2rem, 4.4vw, 3.4rem);
+    letter-spacing: -0.036em;
+    max-width: 16ch;
+  }
+
+  .lead {
+    font-size: clamp(1.05rem, 1.6vw, 1.28rem);
+    color: var(--slate);
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+  }
+
+  .eyebrow-mono {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+  }
+
+  /* ============================================================
+     NAV
+     ============================================================ */
+  .nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(12, 14, 16, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line-soft);
+    transition: border-color 0.3s var(--ease), background 0.3s var(--ease);
+  }
+  .nav.scrolled {
+    background: rgba(12, 14, 16, 0.92);
+    border-bottom-color: var(--line);
+  }
+
+  /* scroll-progress hairline under the nav */
+  .nav__progress {
+    position: absolute;
+    left: 0; bottom: -1px;
+    height: 1px;
+    width: 0%;
+    background: linear-gradient(90deg, var(--amber-deep), var(--amber));
+    box-shadow: 0 0 8px var(--amber-glow);
+  }
+
+  .nav__inner {
+    max-width: var(--maxw);
+    margin-inline: auto;
+    padding: 0 var(--gutter);
+    height: 66px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: -0.02em;
+  }
+  .brand__mark {
+    width: 26px; height: 26px;
+    flex-shrink: 0;
+  }
+  .brand__mark rect,
+  .brand__mark line { transition: all 0.4s var(--ease); }
+
+  .nav__links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav__links a:not(.btn) {
+    font-size: 14px;
+    color: var(--slate);
+    padding: 8px 14px;
+    border-radius: 4px;
+    position: relative;
+    transition: color 0.2s var(--ease);
+  }
+  .nav__links a:not(.btn)::after {
+    content: "";
+    position: absolute;
+    left: 14px; right: 14px; bottom: 4px;
+    height: 1px;
+    background: var(--amber);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.32s var(--ease);
+  }
+  .nav__links a:not(.btn):hover { color: var(--chalk); }
+  .nav__links a:not(.btn):hover::after { transform: scaleX(1); }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    --pad-y: 12px;
+    --pad-x: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: var(--pad-y) var(--pad-x);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.18s var(--ease), box-shadow 0.3s var(--ease),
+                background 0.2s var(--ease), color 0.2s var(--ease),
+                border-color 0.2s var(--ease);
+    will-change: transform;
+  }
+  .btn--primary {
+    background: var(--amber);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: 0 0 0 rgba(255,178,40,0);
+  }
+  .btn--primary:hover {
+    background: var(--white);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 34px -8px var(--amber-glow),
+                0 0 0 1px var(--amber);
+  }
+  .btn--primary:active { transform: translateY(0); }
+  .btn--primary .btn__dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--ink);
+    transition: background 0.2s var(--ease), box-shadow 0.3s var(--ease);
+  }
+  .btn--primary:hover .btn__dot {
+    background: var(--amber-deep);
+    box-shadow: 0 0 10px var(--amber);
+  }
+
+  .btn--ghost {
+    background: transparent;
+    color: var(--chalk);
+    border-color: var(--line);
+  }
+  .btn--ghost:hover {
+    border-color: var(--slate);
+    background: var(--ink-2);
+  }
+
+  .btn--lg { --pad-y: 16px; --pad-x: 30px; font-size: 14px; }
+
+  /* hamburger */
+  .nav__toggle {
+    display: none;
+    width: 42px; height: 42px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+  }
+  .nav__toggle span,
+  .nav__toggle span::before,
+  .nav__toggle span::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 16px; height: 1.5px;
+    background: var(--chalk);
+    transform: translate(-50%, -50%);
+    transition: all 0.3s var(--ease);
+  }
+  .nav__toggle span::before { transform: translate(-50%, -6px); }
+  .nav__toggle span::after  { transform: translate(-50%, 5px); }
+  .nav__toggle.open span { background: transparent; }
+  .nav__toggle.open span::before { transform: translate(-50%, 0) rotate(45deg); }
+  .nav__toggle.open span::after  { transform: translate(-50%, 0) rotate(-45deg); }
+
+  /* ============================================================
+     HERO — asymmetric split
+     ============================================================ */
+  .hero {
+    padding-top: clamp(130px, 20vh, 190px);
+    padding-bottom: clamp(70px, 12vh, 130px);
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .hero__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: clamp(40px, 6vw, 80px);
+    align-items: center;
+  }
+
+  .hero__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    padding: 7px 14px 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    background: var(--ink-2);
+    margin-bottom: 30px;
+  }
+  .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+    position: relative;
+  }
+  .pulse::after {
+    content: "";
+    position: absolute; inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--mint);
+    animation: pulse 2.4s var(--ease) infinite;
+  }
+  @keyframes pulse {
+    0%   { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+
+  .hero h1 { margin-bottom: 26px; }
+  .hero h1 .accent {
+    display: block;
+    color: var(--slate-dim);
+    font-weight: 400;
+    letter-spacing: -0.03em;
+  }
+  /* text stroke trick for the emphasised word */
+  .hero h1 em {
+    font-style: normal;
+    color: var(--amber);
+    position: relative;
+  }
+
+  .hero__sub {
+    max-width: 46ch;
+    margin-bottom: 40px;
+  }
+
+  .hero__cta {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .hero__cta-note {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--slate-dim);
+    letter-spacing: 0.04em;
+    max-width: 24ch;
+  }
+
+  /* ---------- hero signal visualization ---------- */
+  .hero__viz {
+    position: relative;
+    border: 1px solid var(--line);
+    background:
+      linear-gradient(180deg, var(--ink-2), var(--ink));
+    border-radius: 6px;
+    padding: 18px;
+    aspect-ratio: 4 / 3.4;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 40px 80px -40px rgba(0,0,0,0.8);
+  }
+  .hero__viz::before {
+    /* corner ticks */
+    content: "";
+    position: absolute;
+    top: 8px; left: 8px;
+    width: 12px; height: 12px;
+    border-top: 1px solid var(--amber);
+    border-left: 1px solid var(--amber);
+  }
+  .hero__viz::after {
+    content: "";
+    position: absolute;
+    bottom: 8px; right: 8px;
+    width: 12px; height: 12px;
+    border-bottom: 1px solid var(--amber);
+    border-right: 1px solid var(--amber);
+  }
+  .viz__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+    padding: 4px 4px 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .viz__head .val { color: var(--mint); }
+  .viz__chart { flex: 1; position: relative; min-height: 0; }
+  .viz__chart svg { width: 100%; height: 100%; overflow: visible; }
+
+  .viz__foot {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line-soft);
+    margin-top: 12px;
+  }
+  .viz__stat {
+    background: var(--ink-2);
+    padding: 10px 12px;
+  }
+  .viz__stat .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+  }
+  .viz__stat .v {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--chalk);
+    margin-top: 2px;
+  }
+  .viz__stat .v.amber { color: var(--amber); }
+
+  .scan {
+    stroke: var(--amber);
+    stroke-width: 1;
+    opacity: 0.5;
+  }
+
+  /* ============================================================
+     SOCIAL PROOF — metric strip + logo row
+     ============================================================ */
+  .proof {
+    border-bottom: 1px solid var(--line);
+    padding: 0;
+  }
+  .proof__metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--line);
+  }
+  .proof__metric {
+    padding: clamp(28px, 4vw, 44px) clamp(18px, 3vw, 36px);
+    border-right: 1px solid var(--line);
+    position: relative;
+  }
+  .proof__metric:last-child { border-right: none; }
+  .proof__metric .num {
+    font-size: clamp(1.9rem, 3.4vw, 2.9rem);
+    font-weight: 560;
+    letter-spacing: -0.04em;
+    color: var(--white);
+    font-variant-numeric: tabular-nums;
+  }
+  .proof__metric .num .u { color: var(--amber); }
+  .proof__metric .cap {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+    margin-top: 8px;
+  }
+
+  .proof__logos {
+    display: flex;
+    align-items: center;
+    gap: clamp(24px, 5vw, 60px);
+    padding: 26px var(--gutter);
+    flex-wrap: wrap;
+    max-width: var(--maxw);
+    margin-inline: auto;
+  }
+  .proof__logos .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+    white-space: nowrap;
+  }
+  .logo {
+    color: var(--slate-dim);
+    opacity: 0.75;
+    transition: color 0.3s var(--ease), opacity 0.3s var(--ease);
+  }
+  .logo:hover { color: var(--chalk); opacity: 1; }
+  .logo svg { height: 20px; width: auto; }
+
+  /* ============================================================
+     FEATURES — grid cells that light up on hover
+     ============================================================ */
+  .features { padding: clamp(80px, 12vh, 140px) 0; }
+  .features__head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 40px;
+    align-items: end;
+    margin-bottom: 64px;
+  }
+  .features__head p { color: var(--slate); }
+
+  .features__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--line);
+    background: var(--line);
+    gap: 1px;
+  }
+  .feature {
+    background: var(--ink);
+    padding: clamp(28px, 3.4vw, 44px);
+    position: relative;
+    overflow: hidden;
+    transition: background 0.4s var(--ease);
+  }
+  .feature::before {
+    /* scan-line sweep */
+    content: "";
+    position: absolute;
+    left: 0; right: 0;
+    top: -2px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--amber), transparent);
+    transform: translateY(-6px);
+    opacity: 0;
+    transition: transform 0.6s var(--ease), opacity 0.4s var(--ease);
+  }
+  .feature:hover {
+    background: var(--ink-2);
+  }
+  .feature:hover::before {
+    opacity: 1;
+    transform: translateY(clamp(150px, 22vw, 320px));
+  }
+
+  .feature__idx {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--slate-dim);
+    margin-bottom: 28px;
+  }
+  .feature__icon {
+    width: 44px; height: 44px;
+    margin-bottom: 24px;
+    color: var(--amber);
+  }
+  .feature__icon svg { width: 100%; height: 100%; overflow: visible; }
+  .feature__icon [data-anim] {
+    transition: all 0.5s var(--ease);
+  }
+  .feature:hover .feature__icon [data-anim="dash"] {
+    stroke-dashoffset: 0;
+  }
+  .feature:hover .feature__icon [data-anim="rise"] {
+    transform: translateY(-3px);
+  }
+
+  .feature h3 {
+    font-size: 1.32rem;
+    letter-spacing: -0.028em;
+    margin-bottom: 12px;
+  }
+  .feature p {
+    font-size: 0.98rem;
+    color: var(--slate);
+    line-height: 1.6;
+  }
+  .feature__meta {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .feature__meta .tick { color: var(--mint); }
+
+  /* ============================================================
+     HOW IT WORKS — horizontal stepped track
+     ============================================================ */
+  .how {
+    padding: clamp(80px, 12vh, 130px) 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: var(--ink-2);
+  }
+  .how__head { margin-bottom: 60px; max-width: 60ch; }
+  .how__head p { color: var(--slate); margin-top: 18px; }
+
+  .how__track {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    counter-reset: step;
+  }
+  .step {
+    padding: 32px 28px 32px 0;
+    position: relative;
+    border-top: 1px solid var(--line);
+  }
+  .step::before {
+    /* node on the track */
+    content: "";
+    position: absolute;
+    top: -5px; left: 0;
+    width: 9px; height: 9px;
+    background: var(--ink-2);
+    border: 1px solid var(--slate-dim);
+    transform: rotate(45deg);
+    transition: all 0.35s var(--ease);
+  }
+  .step:first-child::before { border-color: var(--amber); background: var(--amber); }
+  .step:hover::before {
+    border-color: var(--amber);
+    background: var(--amber);
+    box-shadow: 0 0 14px var(--amber-glow);
+  }
+  .step__n {
+    counter-increment: step;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    margin-bottom: 16px;
+  }
+  .step__n::before { content: "0" counter(step) " / "; color: var(--slate-dim); }
+  .step h3 {
+    font-size: 1.16rem;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+  .step p {
+    font-size: 0.94rem;
+    color: var(--slate);
+    padding-right: 12px;
+  }
+  .step__cmd {
+    margin-top: 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--slate);
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--amber);
+    padding: 8px 12px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .step__cmd .p { color: var(--amber); }
+
+  /* ============================================================
+     PRICING — 3 tiers, border-draw on hover
+     ============================================================ */
+  .pricing { padding: clamp(80px, 12vh, 140px) 0; }
+  .pricing__head {
+    text-align: left;
+    margin-bottom: 60px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+    gap: 40px;
+    align-items: end;
+  }
+  .pricing__head p { color: var(--slate); }
+
+  .tiers {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .tier {
+    background: var(--ink);
+    padding: clamp(28px, 3vw, 40px);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .tier__border {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .tier__border rect {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.5;
+    stroke-dasharray: 1 1;
+    stroke-dashoffset: 0;
+    opacity: 0;
+    transition: opacity 0.3s var(--ease);
+  }
+  .tier:hover .tier__border rect {
+    opacity: 1;
+    stroke-dasharray: var(--peri);
+    stroke-dashoffset: var(--peri);
+    animation: draw 0.9s var(--ease) forwards;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .tier--featured {
+    background: var(--ink-2);
+  }
+  .tier--featured::after {
+    content: "MOST DEPLOYED";
+    position: absolute;
+    top: 0; right: 0;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    background: var(--amber);
+    color: var(--ink);
+    padding: 5px 12px;
+    font-weight: 600;
+  }
+
+  .tier__name {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 20px;
+  }
+  .tier__price {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .tier__price .amt {
+    font-size: clamp(2.4rem, 4vw, 3.2rem);
+    font-weight: 570;
+    letter-spacing: -0.04em;
+    color: var(--white);
+    font-variant-numeric: tabular-nums;
+  }
+  .tier__price .per {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--slate-dim);
+  }
+  .tier__meta {
+    font-size: 0.9rem;
+    color: var(--slate-dim);
+    margin-bottom: 28px;
+    min-height: 2.6em;
+  }
+  .tier .btn { width: 100%; justify-content: center; margin-bottom: 28px; }
+
+  .tier__list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    font-size: 0.94rem;
+    color: var(--slate);
+  }
+  .tier__list li {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+  }
+  .tier__list li::before {
+    content: "";
+    width: 14px; height: 14px;
+    flex-shrink: 0;
+    margin-top: 4px;
+    background: var(--amber);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 8.5l4 4 8-9' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 8.5l4 4 8-9' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .tier__list li.muted { color: var(--slate-dim); }
+  .tier__list li.muted::before { background: var(--slate-dim); }
+
+  /* ============================================================
+     FOOTER
+     ============================================================ */
+  .footer {
+    border-top: 1px solid var(--line);
+    padding: clamp(60px, 9vh, 100px) 0 40px;
+    background: var(--ink);
+  }
+  .footer__cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 40px;
+    align-items: center;
+    padding-bottom: clamp(50px, 8vh, 80px);
+    border-bottom: 1px solid var(--line);
+  }
+  .footer__cta h2 {
+    font-size: clamp(1.8rem, 3.6vw, 2.8rem);
+    letter-spacing: -0.035em;
+    max-width: 18ch;
+  }
+
+  .footer__cols {
+    display: grid;
+    grid-template-columns: 1.6fr repeat(3, 1fr);
+    gap: 40px;
+    padding: clamp(44px, 7vh, 70px) 0;
+  }
+  .footer__brand .brand { margin-bottom: 16px; }
+  .footer__brand p {
+    font-size: 0.9rem;
+    color: var(--slate-dim);
+    max-width: 32ch;
+  }
+  .footer__col h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate-dim);
+    margin-bottom: 18px;
+    font-weight: 500;
+  }
+  .footer__col a {
+    display: block;
+    font-size: 0.92rem;
+    color: var(--slate);
+    padding: 5px 0;
+    transition: color 0.2s var(--ease), padding-left 0.2s var(--ease);
+  }
+  .footer__col a:hover { color: var(--amber); padding-left: 6px; }
+
+  .footer__base {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 30px;
+    border-top: 1px solid var(--line-soft);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--slate-dim);
+    letter-spacing: 0.04em;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .footer__base .sys {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .footer__base .sys .pulse { background: var(--mint); }
+
+  /* ============================================================
+     REVEAL ON SCROLL
+     ============================================================ */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition-duration: 0.01ms !important; }
+    .reveal { opacity: 1; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+  @media (max-width: 1080px) {
+    :root { --grid-unit: 72px; }
+    .features__grid { grid-template-columns: repeat(2, 1fr); }
+    .feature:nth-child(3) { grid-column: 1 / -1; }
+    .how__track { grid-template-columns: repeat(2, 1fr); }
+    .step { border-top: none; }
+    .step:nth-child(-n+2) { border-top: 1px solid var(--line); }
+  }
+
+  @media (max-width: 860px) {
+    body { font-size: 16px; }
+    .nav__links {
+      position: fixed;
+      inset: 66px 0 auto 0;
+      flex-direction: column;
+      align-items: stretch;
+      background: var(--ink);
+      border-bottom: 1px solid var(--line);
+      padding: 12px var(--gutter) 26px;
+      gap: 2px;
+      transform: translateY(-8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s var(--ease), transform 0.28s var(--ease);
+    }
+    .nav__links.open { opacity: 1; transform: none; pointer-events: auto; }
+    .nav__links a:not(.btn) { padding: 14px 4px; font-size: 15px; border-bottom: 1px solid var(--line-soft); }
+    .nav__links a:not(.btn)::after { display: none; }
+    .nav__links .btn { margin-top: 14px; justify-content: center; }
+    .nav__toggle { display: block; }
+
+    .hero__grid { grid-template-columns: 1fr; gap: 48px; }
+    .hero__viz { max-width: 460px; }
+
+    .proof__metrics { grid-template-columns: repeat(2, 1fr); }
+    .proof__metric:nth-child(2) { border-right: none; }
+    .proof__metric:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+
+    .features__head,
+    .pricing__head,
+    .footer__cta { grid-template-columns: 1fr; }
+    .footer__cta { text-align: left; }
+
+    .features__grid { grid-template-columns: 1fr; }
+    .feature:nth-child(3) { grid-column: auto; }
+
+    .how__track { grid-template-columns: 1fr; }
+    .step:nth-child(n) { border-top: 1px solid var(--line); }
+
+    .tiers { grid-template-columns: 1fr; }
+    .tier--featured { order: -1; }
+
+    .footer__cols { grid-template-columns: 1fr 1fr; }
+    .footer__brand { grid-column: 1 / -1; }
+  }
+
+  @media (max-width: 520px) {
+    :root { --grid-unit: 56px; }
+    .proof__metrics { grid-template-columns: 1fr; }
+    .proof__metric { border-right: none; border-bottom: 1px solid var(--line); }
+    .footer__cols { grid-template-columns: 1fr; }
+    .hero__cta { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .hero__cta .btn { width: 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-field" aria-hidden="true"></div>
+
+<!-- ============================ NAV ============================ -->
+<nav class="nav" id="nav">
+  <div class="nav__inner">
+    <a href="#top" class="brand" aria-label="Nordveil home">
+      <svg class="brand__mark" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="24" height="24" stroke="#e8ebec" stroke-width="1.4"/>
+        <line x1="1"  y1="9"  x2="25" y2="9"  stroke="#262d32" stroke-width="1"/>
+        <line x1="1"  y1="17" x2="25" y2="17" stroke="#262d32" stroke-width="1"/>
+        <line x1="9"  y1="1"  x2="9"  y2="25" stroke="#262d32" stroke-width="1"/>
+        <line x1="17" y1="1"  x2="17" y2="25" stroke="#262d32" stroke-width="1"/>
+        <path d="M4 20 L10 12 L15 16 L22 5" stroke="#ffb228" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Nordveil
+    </a>
+
+    <div class="nav__links" id="navLinks">
+      <a href="#features">Platform</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#footer">Docs</a>
+      <a href="#pricing" class="btn btn--primary">
+        <span class="btn__dot"></span>Start free
+      </a>
+    </div>
+
+    <button class="nav__toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+      <span></span>
+    </button>
+  </div>
+  <div class="nav__progress" id="navProgress"></div>
+</nav>
+
+<span id="top"></span>
+
+<div class="layer">
+
+<!-- ============================ HERO ============================ -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero__grid">
+
+      <div class="hero__copy">
+        <span class="hero__status">
+          <span class="pulse" aria-hidden="true"></span>
+          All systems observed
+        </span>
+
+        <h1 class="display">
+          See the failure
+          <em>before</em> the pager does.
+          <span class="accent">Infrastructure monitoring for teams that ship.</span>
+        </h1>
+
+        <p class="lead hero__sub">
+          Nordveil unifies metrics, traces and logs into one signal plane —
+          built for mid-size engineering teams who need answers in seconds,
+          not a war room and a dashboard safari.
+        </p>
+
+        <div class="hero__cta">
+          <a href="#pricing" class="btn btn--primary btn--lg">
+            <span class="btn__dot"></span>
+            Deploy in 4 minutes
+          </a>
+          <p class="hero__cta-note">
+            No credit card. Agent installs with one command.
+          </p>
+        </div>
+      </div>
+
+      <!-- signal visualization -->
+      <div class="hero__viz" aria-hidden="true">
+        <div class="viz__head">
+          <span>cluster / eu-north-1</span>
+          <span class="val" id="vizVal">p99 · 42ms</span>
+        </div>
+        <div class="viz__chart">
+          <svg viewBox="0 0 320 200" preserveAspectRatio="none">
+            <!-- internal grid -->
+            <g stroke="#1b2125" stroke-width="1">
+              <line x1="0" y1="50"  x2="320" y2="50"/>
+              <line x1="0" y1="100" x2="320" y2="100"/>
+              <line x1="0" y1="150" x2="320" y2="150"/>
+              <line x1="80"  y1="0" x2="80"  y2="200"/>
+              <line x1="160" y1="0" x2="160" y2="200"/>
+              <line x1="240" y1="0" x2="240" y2="200"/>
+            </g>
+            <!-- area fill under primary signal -->
+            <path id="areaPath" fill="url(#amberFade)" stroke="none"
+              d="M0,140 L0,200 L320,200 L320,120 Z"/>
+            <defs>
+              <linearGradient id="amberFade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ffb228" stop-opacity="0.20"/>
+                <stop offset="1" stop-color="#ffb228" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- secondary (mint) signal -->
+            <polyline id="line2" fill="none" stroke="#4fd1b5" stroke-width="1.4"
+              stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round"
+              points="0,170 40,168 80,172 120,165 160,169 200,160 240,166 280,158 320,162"/>
+            <!-- primary (amber) signal -->
+            <polyline id="line1" fill="none" stroke="#ffb228" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"
+              points="0,140 40,120 80,132 120,96 160,110 200,70 240,88 280,54 320,120"/>
+            <!-- anomaly marker -->
+            <circle id="anomaly" cx="280" cy="54" r="4" fill="#0c0e10" stroke="#ff5a45" stroke-width="2"/>
+            <!-- moving scan line -->
+            <line class="scan" id="scanLine" x1="0" y1="0" x2="0" y2="200"/>
+          </svg>
+        </div>
+        <div class="viz__foot">
+          <div class="viz__stat"><div class="k">Hosts</div><div class="v">1,284</div></div>
+          <div class="viz__stat"><div class="k">Ingest</div><div class="v amber">3.1M/s</div></div>
+          <div class="viz__stat"><div class="k">MTTR</div><div class="v">6m 12s</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ======================= SOCIAL PROOF ======================= -->
+<section class="proof">
+  <div class="proof__metrics reveal">
+    <div class="proof__metric">
+      <div class="num">400<span class="u">+</span></div>
+      <div class="cap">Engineering teams</div>
+    </div>
+    <div class="proof__metric">
+      <div class="num">92<span class="u">%</span></div>
+      <div class="cap">Faster root cause</div>
+    </div>
+    <div class="proof__metric">
+      <div class="num">3.1<span class="u">M</span></div>
+      <div class="cap">Events / second</div>
+    </div>
+    <div class="proof__metric">
+      <div class="num">18<span class="u">s</span></div>
+      <div class="cap">Median alert to context</div>
+    </div>
+  </div>
+
+  <div class="proof__logos reveal">
+    <span class="label">Trusted by teams at</span>
+    <!-- wordmark logos, all CSS/SVG -->
+    <span class="logo" aria-label="Hallright">
+      <svg viewBox="0 0 120 24" fill="currentColor"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2.4"/><text x="28" y="17" font-family="Inter, sans-serif" font-size="15" font-weight="700" letter-spacing="-0.5">Hallright</text></svg>
+    </span>
+    <span class="logo" aria-label="Kestrel Data">
+      <svg viewBox="0 0 128 24" fill="currentColor"><path d="M4 4 L12 12 L4 20 M12 12 L20 12" stroke="currentColor" stroke-width="2.4" fill="none"/><text x="26" y="17" font-family="Inter, sans-serif" font-size="15" font-weight="700" letter-spacing="-0.5">Kestrel</text></svg>
+    </span>
+    <span class="logo" aria-label="Novo Freight">
+      <svg viewBox="0 0 130 24" fill="currentColor"><rect x="3" y="6" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" transform="rotate(45 9 12)"/><text x="26" y="17" font-family="Inter, sans-serif" font-size="15" font-weight="700" letter-spacing="-0.5">Novo</text></svg>
+    </span>
+    <span class="logo" aria-label="Ternpath">
+      <svg viewBox="0 0 132 24" fill="currentColor"><path d="M4 18 L10 6 L16 18 Z" fill="none" stroke="currentColor" stroke-width="2.4"/><text x="24" y="17" font-family="Inter, sans-serif" font-size="15" font-weight="700" letter-spacing="-0.5">Ternpath</text></svg>
+    </span>
+    <span class="logo" aria-label="Grafton Labs">
+      <svg viewBox="0 0 140 24" fill="currentColor"><path d="M4 12 h6 v-6 h6 v12 h-6 v-6" fill="none" stroke="currentColor" stroke-width="2.4"/><text x="30" y="17" font-family="Inter, sans-serif" font-size="15" font-weight="700" letter-spacing="-0.5">Grafton</text></svg>
+    </span>
+  </div>
+</section>
+
+<!-- ========================= FEATURES ========================= -->
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="marker reveal">Section <b>01</b> / Platform</div>
+
+    <div class="features__head reveal">
+      <h2 class="section-title">One signal plane. No stitching required.</h2>
+      <p class="lead">
+        Every feature is built around a single question — <em>what changed, and where?</em>
+        Correlated data means you stop tab-hopping and start fixing.
+      </p>
+    </div>
+
+    <div class="features__grid reveal">
+
+      <article class="feature">
+        <div class="feature__idx">F—01</div>
+        <div class="feature__icon">
+          <svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path data-anim="dash" d="M2 30 L12 18 L20 24 L30 8 L42 20"
+              stroke-dasharray="70" stroke-dashoffset="70"/>
+            <circle cx="30" cy="8" r="3" fill="currentColor" stroke="none" data-anim="rise"/>
+            <line x1="2" y1="40" x2="42" y2="40" stroke-opacity="0.35"/>
+          </svg>
+        </div>
+        <h3>Correlated metrics &amp; traces</h3>
+        <p>
+          Jump from a latency spike straight to the exact span that caused it.
+          Metrics, traces and logs share one timeline and one set of tags.
+        </p>
+        <div class="feature__meta"><span class="tick">▚</span> Sub-second query on 30-day windows</div>
+      </article>
+
+      <article class="feature">
+        <div class="feature__idx">F—02</div>
+        <div class="feature__icon">
+          <svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="4" y="4" width="36" height="36" stroke-opacity="0.35"/>
+            <path data-anim="dash" d="M4 22 L14 22 L18 12 L24 32 L28 22 L40 22"
+              stroke-dasharray="80" stroke-dashoffset="80"/>
+            <circle cx="24" cy="32" r="3" fill="#ff5a45" stroke="none" data-anim="rise"/>
+          </svg>
+        </div>
+        <h3>Anomaly detection that learns</h3>
+        <p>
+          Baselines adapt to your deploy cadence and traffic seasonality —
+          so a Tuesday 2pm surge isn't a page, but a real regression is.
+        </p>
+        <div class="feature__meta"><span class="tick">▚</span> Trained per-service, retunes nightly</div>
+      </article>
+
+      <article class="feature">
+        <div class="feature__idx">F—03</div>
+        <div class="feature__icon">
+          <svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="22" cy="22" r="6" data-anim="rise"/>
+            <path data-anim="dash" d="M22 4 V12 M22 32 V40 M4 22 H12 M32 22 H40 M9 9 L15 15 M29 29 L35 35"
+              stroke-dasharray="60" stroke-dashoffset="60"/>
+          </svg>
+        </div>
+        <h3>Alert routing with context</h3>
+        <p>
+          Every alert arrives with the graph, the recent deploys and the
+          probable owner attached. On-call opens one link, not twelve.
+        </p>
+        <div class="feature__meta"><span class="tick">▚</span> Native PagerDuty, Slack, Opsgenie</div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ======================== HOW IT WORKS ======================== -->
+<section class="how" id="how">
+  <div class="wrap">
+    <div class="marker reveal">Section <b>02</b> / Rollout</div>
+
+    <div class="how__head reveal">
+      <h2 class="section-title">From zero to observed on a Friday afternoon.</h2>
+      <p class="lead">
+        No sales engineer, no six-week migration. The agent is a single binary
+        and Nordveil auto-discovers what you're already running.
+      </p>
+    </div>
+
+    <div class="how__track reveal">
+      <div class="step">
+        <div class="step__n"></div>
+        <h3>Install the agent</h3>
+        <p>One command on a host or a DaemonSet manifest for Kubernetes. No config file to start.</p>
+        <div class="step__cmd"><span class="p">$</span> curl -sL nordveil.io/i | sh</div>
+      </div>
+      <div class="step">
+        <div class="step__n"></div>
+        <h3>Auto-discovery</h3>
+        <p>Nordveil maps your services, dependencies and hosts within about ninety seconds.</p>
+        <div class="step__cmd"><span class="p">→</span> 41 services · 1,284 hosts found</div>
+      </div>
+      <div class="step">
+        <div class="step__n"></div>
+        <h3>Baselines form</h3>
+        <p>The first 24 hours establish normal. Detection stays quiet until it has signal to trust.</p>
+        <div class="step__cmd"><span class="p">~</span> learning · 62% confident</div>
+      </div>
+      <div class="step">
+        <div class="step__n"></div>
+        <h3>Route &amp; refine</h3>
+        <p>Connect your pager, set ownership by tag, and tune thresholds from real incidents.</p>
+        <div class="step__cmd"><span class="p">✓</span> routes active · noise −74%</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= PRICING ========================= -->
+<section class="pricing" id="pricing">
+  <div class="wrap">
+    <div class="marker reveal">Section <b>03</b> / Pricing</div>
+
+    <div class="pricing__head reveal">
+      <h2 class="section-title">Priced per host. No seat tax, no ingest surprises.</h2>
+      <p class="lead">
+        Every tier includes unlimited users and 15-month retention.
+        You pay for infrastructure, not for looking at it.
+      </p>
+    </div>
+
+    <div class="tiers reveal">
+
+      <div class="tier">
+        <svg class="tier__border" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <rect x="0.75" y="0.75" width="98.5" height="98.5" pathLength="100" style="--peri:100"/>
+        </svg>
+        <div class="tier__name">Signal</div>
+        <div class="tier__price">
+          <span class="amt">$14</span>
+          <span class="per">/ host / mo</span>
+        </div>
+        <p class="tier__meta">For small teams putting their first real monitoring in place.</p>
+        <a href="#" class="btn btn--ghost">Start free trial</a>
+        <ul class="tier__list">
+          <li>Metrics, logs &amp; uptime</li>
+          <li>7-day metric resolution</li>
+          <li>Adaptive anomaly detection</li>
+          <li>Slack &amp; email alerting</li>
+          <li class="muted">Distributed tracing</li>
+          <li class="muted">SSO / SAML</li>
+        </ul>
+      </div>
+
+      <div class="tier tier--featured">
+        <svg class="tier__border" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <rect x="0.75" y="0.75" width="98.5" height="98.5" pathLength="100" style="--peri:100"/>
+        </svg>
+        <div class="tier__name">Plane</div>
+        <div class="tier__price">
+          <span class="amt">$29</span>
+          <span class="per">/ host / mo</span>
+        </div>
+        <p class="tier__meta">The full signal plane for teams running production on-call.</p>
+        <a href="#" class="btn btn--primary"><span class="btn__dot"></span>Start free trial</a>
+        <ul class="tier__list">
+          <li>Everything in Signal</li>
+          <li>Full distributed tracing</li>
+          <li>1-second metric resolution</li>
+          <li>Alert routing + context packets</li>
+          <li>PagerDuty &amp; Opsgenie</li>
+          <li>SSO / SAML included</li>
+        </ul>
+      </div>
+
+      <div class="tier">
+        <svg class="tier__border" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <rect x="0.75" y="0.75" width="98.5" height="98.5" pathLength="100" style="--peri:100"/>
+        </svg>
+        <div class="tier__name">Grid</div>
+        <div class="tier__price">
+          <span class="amt">Custom</span>
+        </div>
+        <p class="tier__meta">For platform teams with compliance, scale or air-gapped needs.</p>
+        <a href="#" class="btn btn--ghost">Talk to engineering</a>
+        <ul class="tier__list">
+          <li>Everything in Plane</li>
+          <li>Self-hosted or VPC deploy</li>
+          <li>Custom retention &amp; residency</li>
+          <li>Audit log streaming</li>
+          <li>99.95% uptime SLA</li>
+          <li>Named reliability contact</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ========================== FOOTER ========================== -->
+<footer class="footer" id="footer">
+  <div class="wrap">
+
+    <div class="footer__cta reveal">
+      <h2>Your next incident is already forming. Watch it happen.</h2>
+      <a href="#pricing" class="btn btn--primary btn--lg">
+        <span class="btn__dot"></span>Start monitoring free
+      </a>
+    </div>
+
+    <div class="footer__cols">
+      <div class="footer__brand">
+        <a href="#top" class="brand">
+          <svg class="brand__mark" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <rect x="1" y="1" width="24" height="24" stroke="#e8ebec" stroke-width="1.4"/>
+            <line x1="1" y1="9" x2="25" y2="9" stroke="#262d32" stroke-width="1"/>
+            <line x1="1" y1="17" x2="25" y2="17" stroke="#262d32" stroke-width="1"/>
+            <line x1="9" y1="1" x2="9" y2="25" stroke="#262d32" stroke-width="1"/>
+            <line x1="17" y1="1" x2="17" y2="25" stroke="#262d32" stroke-width="1"/>
+            <path d="M4 20 L10 12 L15 16 L22 5" stroke="#ffb228" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Nordveil
+        </a>
+        <p>Infrastructure monitoring for mid-size engineering teams. Built in Oslo &amp; Berlin.</p>
+      </div>
+
+      <div class="footer__col">
+        <h4>Product</h4>
+        <a href="#features">Platform</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#">Changelog</a>
+        <a href="#">Status</a>
+      </div>
+
+      <div class="footer__col">
+        <h4>Resources</h4>
+        <a href="#">Documentation</a>
+        <a href="#">API reference</a>
+        <a href="#">Agent install</a>
+        <a href="#">Migration guides</a>
+      </div>
+
+      <div class="footer__col">
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Careers</a>
+        <a href="#">Security</a>
+        <a href="#">Contact</a>
+      </div>
+    </div>
+
+    <div class="footer__base">
+      <span>© 2026 Nordveil Systems AS. All rights reserved.</span>
+      <span class="sys">
+        <span class="pulse" aria-hidden="true"></span>
+        All systems operational · status.nordveil.io
+      </span>
+    </div>
+
+  </div>
+</footer>
+
+</div><!-- /.layer -->
+
+<script>
+(function () {
+  "use strict";
+
+  var nav       = document.getElementById("nav");
+  var progress  = document.getElementById("navProgress");
+  var toggle    = document.getElementById("navToggle");
+  var navLinks  = document.getElementById("navLinks");
+  var reduce    = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- mobile menu ---------- */
+  function closeMenu() {
+    toggle.classList.remove("open");
+    navLinks.classList.remove("open");
+    toggle.setAttribute("aria-expanded", "false");
+  }
+  toggle.addEventListener("click", function () {
+    var open = toggle.classList.toggle("open");
+    navLinks.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+  });
+  navLinks.addEventListener("click", function (e) {
+    if (e.target.closest("a")) closeMenu();
+  });
+  window.addEventListener("resize", function () {
+    if (window.innerWidth > 860) closeMenu();
+  });
+
+  /* ---------- nav state + scroll progress ---------- */
+  var ticking = false;
+  function onScroll() {
+    var y   = window.scrollY || window.pageYOffset;
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    nav.classList.toggle("scrolled", y > 12);
+    progress.style.width = (max > 0 ? (y / max) * 100 : 0) + "%";
+    ticking = false;
+  }
+  window.addEventListener("scroll", function () {
+    if (!ticking) { window.requestAnimationFrame(onScroll); ticking = true; }
+  }, { passive: true });
+  onScroll();
+
+  /* ---------- reveal on scroll ---------- */
+  var reveals = document.querySelectorAll(".reveal");
+  if (reduce || !("IntersectionObserver" in window)) {
+    reveals.forEach(function (el) { el.classList.add("in"); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          en.target.classList.add("in");
+          io.unobserve(en.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+    reveals.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---------- hero: live-ish signal + scan line ---------- */
+  var scanLine = document.getElementById("scanLine");
+  var line1    = document.getElementById("line1");
+  var line2    = document.getElementById("line2");
+  var areaPath = document.getElementById("areaPath");
+  var anomaly  = document.getElementById("anomaly");
+  var vizVal   = document.getElementById("vizVal");
+
+  if (!reduce && scanLine) {
+    var W = 320, H = 200, cols = 8;
+    var t = 0;
+
+    function series(seed, amp, base) {
+      var pts = [];
+      for (var i = 0; i <= cols; i++) {
+        var x = (i / cols) * W;
+        var n = Math.sin((i * 0.9) + seed) * amp
+              + Math.sin((i * 2.3) + seed * 1.7) * (amp * 0.35);
+        pts.push(x + "," + (base - n).toFixed(1));
+      }
+      return pts;
+    }
+
+    var frame = 0;
+    function tick() {
+      t += 0.03;
+
+      // scan sweep
+      var sx = ((t * 60) % (W + 40)) - 20;
+      scanLine.setAttribute("x1", sx);
+      scanLine.setAttribute("x2", sx);
+      scanLine.setAttribute("opacity", sx < 0 || sx > W ? 0 : 0.5);
+
+      // redraw signals every ~9 frames (~150ms) so it feels like data, not animation
+      frame++;
+      if (frame % 9 === 0) {
+        var s1 = series(t * 0.6, 34, 118);
+        var s2 = series(t * 0.6 + 2.1, 12, 168);
+        line1.setAttribute("points", s1.join(" "));
+        line2.setAttribute("points", s2.join(" "));
+
+        var last = s1[s1.length - 1].split(",");
+        var mid  = s1[5].split(",");
+        areaPath.setAttribute("d",
+          "M0," + s1[0].split(",")[1] +
+          " L" + s1.map(function (p) { return p; }).join(" L") +
+          " L" + W + "," + H + " L0," + H + " Z");
+
+        // park the anomaly dot on the highest (lowest-y) point
+        var hi = s1.reduce(function (a, p, i) {
+          var yv = parseFloat(p.split(",")[1]);
+          return yv < a.y ? { y: yv, x: parseFloat(p.split(",")[0]) } : a;
+        }, { y: 999, x: 0 });
+        anomaly.setAttribute("cx", hi.x);
+        anomaly.setAttribute("cy", hi.y);
+
+        var ms = (38 + Math.round(Math.abs(Math.sin(t)) * 12));
+        vizVal.textContent = "p99 · " + ms + "ms";
+      }
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  /* ---------- proof metrics: count up once ---------- */
+  var nums = document.querySelectorAll(".proof__metric .num");
+  function countUp(el) {
+    var full = el.textContent;
+    var m = full.match(/([\d.]+)/);
+    if (!m) return;
+    var target = parseFloat(m[1]);
+    var suffix = full.slice(m.index + m[1].length);
+    var prefix = full.slice(0, m.index);
+    var dec = (m[1].split(".")[1] || "").length;
+    var start = null, dur = 1100;
+    function step(ts) {
+      if (!start) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      var v = (target * eased).toFixed(dec);
+      el.innerHTML = prefix + v + '<span class="u">' + suffix.replace(/<[^>]+>/g, "") + "</span>";
+      if (p < 1) requestAnimationFrame(step);
+      else el.innerHTML = prefix + m[1] + '<span class="u">' + suffix.replace(/<[^>]+>/g, "") + "</span>";
+    }
+    requestAnimationFrame(step);
+  }
+  if (!reduce && "IntersectionObserver" in window) {
+    var nio = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { countUp(en.target); nio.unobserve(en.target); }
+      });
+    }, { threshold: 0.6 });
+    nums.forEach(function (el) { nio.observe(el); });
+  }
+
+})();
+</script>
+
+</body>
+</html>

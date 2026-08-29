@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nordveil — Infrastructure Monitoring for Engineering Teams</title>
+<style>
+/* ============================================================
+   NORDVEIL — ruled ledger / instrumentation aesthetic
+   ============================================================ */
+
+:root{
+  --bone:      #E8E6DF;
+  --bone-2:    #DEDBD1;
+  --paper:     #F2F0EA;
+  --ink:       #14161A;
+  --ink-2:     #2B2F36;
+  --graphite:  #5A6068;
+  --mute:      #8B9099;
+  --rule:      rgba(20,22,26,.13);
+  --rule-soft: rgba(20,22,26,.07);
+
+  --amber:     #E5622B;   /* signal */
+  --amber-dk:  #C24C1B;
+  --moss:      #3F5A46;   /* nominal */
+  --slate:     #29323C;
+
+  --gut: clamp(20px, 5vw, 64px);
+  --maxw: 1320px;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--bone);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *{animation-duration:.001ms !important; transition-duration:.001ms !important}
+}
+
+/* ---------- ruled ledger background: the signature ---------- */
+.ledger{ position:fixed; inset:0; pointer-events:none; z-index:0 }
+.ledger .cols{
+  position:absolute; inset:0;
+  max-width:var(--maxw); margin:0 auto;
+  padding:0 var(--gut);
+  display:grid; grid-template-columns:repeat(4,1fr);
+}
+@media(min-width:900px){ .ledger .cols{grid-template-columns:repeat(12,1fr)} }
+.ledger .cols span{ border-left:1px solid var(--rule-soft) }
+.ledger .cols span:last-child{ border-right:1px solid var(--rule-soft) }
+.ledger::after{
+  content:""; position:absolute; inset:0;
+  background:repeating-linear-gradient(to bottom, transparent 0 47px, rgba(20,22,26,.035) 47px 48px);
+}
+
+.wrap{position:relative; z-index:1; max-width:var(--maxw); margin:0 auto; padding:0 var(--gut)}
+
+/* ---------- type scale: aggressive jumps ---------- */
+.label{
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--graphite); font-weight:500;
+}
+h1,h2,h3{margin:0; font-weight:520; letter-spacing:-.03em; line-height:.98}
+h1{ font-size:clamp(44px, 8.2vw, 92px); letter-spacing:-.045em; line-height:.92 }
+h2{ font-size:clamp(32px, 5vw, 56px) }
+h3{ font-size:clamp(19px, 2vw, 22px); letter-spacing:-.015em; line-height:1.2 }
+p{margin:0}
+a{color:inherit; text-decoration:none}
+
+.lede{ font-size:clamp(16px,1.6vw,19px); line-height:1.62; color:var(--ink-2); max-width:46ch }
+
+/* ============================ NAV ============================ */
+header{
+  position:sticky; top:0; z-index:50;
+  background:rgba(232,230,223,.82);
+  backdrop-filter:blur(10px) saturate(140%);
+  -webkit-backdrop-filter:blur(10px) saturate(140%);
+  border-bottom:1px solid transparent;
+  transition:border-color .3s, background .3s;
+}
+header.stuck{ border-bottom-color:var(--rule); background:rgba(232,230,223,.94) }
+.nav{ display:flex; align-items:center; gap:24px; height:68px }
+
+.brand{ display:flex; align-items:center; gap:10px; margin-right:auto }
+.mark{ width:22px; height:22px; display:block; flex:none }
+.brand b{ font-weight:600; font-size:17.5px; letter-spacing:-.025em }
+.brand .tag{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
+  color:var(--mute); border:1px solid var(--rule); padding:2px 5px; border-radius:2px;
+  text-transform:uppercase;
+}
+@media(max-width:560px){ .brand .tag{display:none} }
+
+.navlinks{ display:none; gap:2px; align-items:center }
+@media(min-width:900px){ .navlinks{display:flex} }
+.navlinks a{
+  font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--graphite); padding:8px 13px; position:relative;
+}
+/* deliberate hover: index number fades in, rule draws from left */
+.navlinks a::before{
+  content:attr(data-i); position:absolute; left:3px; top:50%; transform:translate(-4px,-50%);
+  font-size:9px; color:var(--amber); opacity:0; transition:opacity .22s, transform .22s;
+}
+.navlinks a::after{
+  content:""; position:absolute; left:13px; right:13px; bottom:4px; height:1px;
+  background:var(--ink); transform:scaleX(0); transform-origin:left;
+  transition:transform .28s cubic-bezier(.2,.7,.2,1);
+}
+.navlinks a:hover{ color:var(--ink) }
+.navlinks a:hover::before{ opacity:1; transform:translate(0,-50%) }
+.navlinks a:hover::after{ transform:scaleX(1) }
+
+.btn{
+  display:inline-flex; align-items:center; gap:10px;
+  font-family:var(--mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+  padding:11px 18px; border:1px solid var(--ink); border-radius:2px;
+  background:var(--ink); color:var(--bone);
+  position:relative; overflow:hidden; cursor:pointer; transition:color .3s;
+}
+.btn span{position:relative; z-index:1}
+/* wipe fill upward + arrow nudge */
+.btn::before{
+  content:""; position:absolute; inset:0; background:var(--amber);
+  transform:translateY(101%); transition:transform .34s cubic-bezier(.2,.75,.2,1);
+}
+.btn:hover::before{ transform:translateY(0) }
+.btn .arw{ transition:transform .34s cubic-bezier(.2,.75,.2,1) }
+.btn:hover .arw{ transform:translateX(4px) }
+.btn:focus-visible{ outline:2px solid var(--amber); outline-offset:3px }
+
+.btn.ghost{ background:transparent; color:var(--ink); border-color:var(--rule) }
+.btn.ghost:hover{ color:var(--bone); border-color:var(--ink) }
+.btn.ghost::before{ background:var(--ink) }
+
+.burger{
+  display:grid; place-items:center; width:40px; height:40px; margin-right:-8px;
+  background:none; border:1px solid var(--rule); border-radius:2px; cursor:pointer; padding:0;
+}
+@media(min-width:900px){ .burger{display:none} }
+.burger i{ display:block; width:16px; height:1.5px; background:var(--ink); position:relative; transition:background .2s }
+.burger i::before,.burger i::after{
+  content:""; position:absolute; left:0; width:16px; height:1.5px; background:var(--ink);
+  transition:transform .3s cubic-bezier(.2,.7,.2,1);
+}
+.burger i::before{ transform:translateY(-5px) }
+.burger i::after{  transform:translateY(5px) }
+.burger[aria-expanded="true"] i{ background:transparent }
+.burger[aria-expanded="true"] i::before{ transform:rotate(45deg) }
+.burger[aria-expanded="true"] i::after{  transform:rotate(-45deg) }
+
+.drawer{
+  display:grid; grid-template-rows:0fr; overflow:hidden;
+  transition:grid-template-rows .38s cubic-bezier(.2,.7,.2,1);
+  border-top:1px solid transparent;
+}
+.drawer.open{ grid-template-rows:1fr; border-top-color:var(--rule) }
+.drawer > div{ min-height:0 }
+.drawer nav{ display:flex; flex-direction:column; padding:8px 0 20px }
+.drawer nav a{
+  font-family:var(--mono); font-size:13px; letter-spacing:.08em; text-transform:uppercase;
+  padding:14px 0; border-bottom:1px solid var(--rule-soft); display:flex; gap:14px; align-items:baseline;
+}
+.drawer nav a i{ font-style:normal; font-size:10px; color:var(--amber) }
+.drawer .btn{ margin-top:18px; justify-content:center; border-bottom:0 }
+
+/* ============================ HERO ============================ */
+.hero{ padding:clamp(48px,8vw,96px) 0 clamp(56px,7vw,88px) }
+.hero-grid{ display:grid; gap:clamp(36px,5vw,56px) }
+@media(min-width:980px){
+  .hero-grid{ grid-template-columns:7fr 5fr; align-items:end; gap:56px }
+}
+
+.eyebrow{ display:flex; align-items:center; gap:12px; margin-bottom:26px }
+.pulse{ width:7px; height:7px; border-radius:50%; background:var(--amber); flex:none; position:relative }
+.pulse::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%; border:1px solid var(--amber);
+  animation:ping 2.4s cubic-bezier(0,.6,.4,1) infinite;
+}
+@keyframes ping{ 0%{transform:scale(.5); opacity:.9} 100%{transform:scale(1.9); opacity:0} }
+
+h1 .dim{ color:var(--mute) }
+h1 .mark-amber{ position:relative; display:inline-block }
+h1 .mark-amber::after{
+  content:""; position:absolute; left:-2px; right:-2px; bottom:.1em; height:.055em; background:var(--amber);
+}
+
+.hero-copy{ margin-top:30px; display:grid; gap:28px }
+.hero-cta{ display:flex; flex-wrap:wrap; align-items:center; gap:20px }
+.cta-note{ font-family:var(--mono); font-size:11.5px; letter-spacing:.05em; color:var(--mute) }
+
+/* --- instrument panel --- */
+.panel{
+  border:1px solid var(--rule); background:var(--paper);
+  border-radius:3px; overflow:hidden;
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset;
+}
+.panel-top{
+  display:flex; align-items:center; gap:10px; padding:10px 14px;
+  border-bottom:1px solid var(--rule); font-family:var(--mono); font-size:10.5px;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--graphite);
+}
+.panel-top .dot{ width:6px;height:6px;border-radius:50%;background:var(--moss); flex:none }
+.panel-top .r{ margin-left:auto; color:var(--mute); font-variant-numeric:tabular-nums }
+.panel canvas{ display:block; width:100%; height:172px }
+.panel-foot{ display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--rule) }
+.panel-foot div{ padding:12px 14px; border-left:1px solid var(--rule) }
+.panel-foot div:first-child{ border-left:0 }
+.panel-foot .k{ font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--mute) }
+.panel-foot .v{ font-family:var(--mono); font-size:19px; letter-spacing:-.02em; margin-top:3px; font-variant-numeric:tabular-nums }
+.panel-foot .v.on{ color:var(--amber) }
+
+/* ============================ STRIP ============================ */
+.strip{
+  border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+  background:var(--slate); color:var(--bone); position:relative; z-index:1;
+}
+.strip .wrap{ display:grid; grid-template-columns:1fr 1fr }
+@media(min-width:760px){ .strip .wrap{ grid-template-columns:repeat(4,1fr) } }
+.metric{ padding:26px 0 24px 20px; border-left:1px solid rgba(232,230,223,.14) }
+.metric:first-child{ border-left:0; padding-left:0 }
+@media(max-width:759px){
+  .metric:nth-child(3){ border-left:0; padding-left:0 }
+  .metric:nth-child(-n+2){ border-bottom:1px solid rgba(232,230,223,.14) }
+}
+.metric .n{
+  font-family:var(--mono); font-size:clamp(26px,3.4vw,38px); letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums; line-height:1;
+}
+.metric .n em{ font-style:normal; color:var(--amber) }
+.metric .c{ font-size:12.5px; color:rgba(232,230,223,.58); margin-top:9px; line-height:1.45; max-width:22ch }
+
+.logos{ border-bottom:1px solid var(--rule); background:var(--bone-2); position:relative; z-index:1 }
+.logos .wrap{
+  display:flex; flex-wrap:wrap; align-items:center; gap:clamp(20px,4vw,52px);
+  padding-top:22px; padding-bottom:22px;
+}
+.logos .lbl{ font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--mute); margin-right:auto }
+.logo{ display:flex; align-items:center; gap:8px; color:var(--graphite); transition:color .25s }
+.logo:hover{ color:var(--ink) }
+.logo svg{ display:block; flex:none }
+.logo span{ font-size:14.5px; font-weight:560; letter-spacing:-.01em; white-space:nowrap }
+
+/* ============================ SECTION FRAME ============================ */
+section{ position:relative; z-index:1 }
+.sec{ padding:clamp(64px,9vw,120px) 0 }
+.sec-head{ display:grid; gap:22px; margin-bottom:clamp(40px,5vw,64px) }
+@media(min-width:900px){
+  .sec-head{ grid-template-columns:auto 1fr auto; align-items:start; gap:40px }
+  .sec-head .lede{ justify-self:end }
+}
+.idx{
+  font-family:var(--mono); font-size:11px; letter-spacing:.2em; color:var(--amber);
+  white-space:nowrap; padding-top:.5em;
+}
+.idx b{ color:var(--graphite); font-weight:500 }
+.sec-head .lede{ max-width:38ch }
+
+/* ---------- FEATURES: asymmetric stagger ---------- */
+.feats{ display:grid; border-top:1px solid var(--rule) }
+.feat{
+  display:grid; gap:20px; padding:clamp(30px,4vw,44px) 0;
+  border-bottom:1px solid var(--rule); position:relative; transition:background .35s;
+}
+@media(min-width:900px){
+  .feat{ grid-template-columns:.55fr 1.3fr 1.15fr; gap:44px; align-items:start }
+  .feat:nth-child(2){ padding-left:6% }
+  .feat:nth-child(3){ padding-left:12% }
+}
+.feat:hover{ background:linear-gradient(90deg, rgba(229,98,43,.055), rgba(229,98,43,0) 62%) }
+.feat::before{
+  content:""; position:absolute; left:0; top:0; bottom:0; width:2px; background:var(--amber);
+  transform:scaleY(0); transform-origin:top; transition:transform .42s cubic-bezier(.2,.7,.2,1);
+}
+.feat:hover::before{ transform:scaleY(1) }
+.feat .fi{ font-family:var(--mono); font-size:11px; letter-spacing:.16em; color:var(--mute) }
+.feat h3{ max-width:16ch }
+.feat .fd{ color:var(--graphite); font-size:15.5px; line-height:1.62; max-width:44ch }
+.feat .fd b{ color:var(--ink); font-weight:560 }
+
+.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:16px }
+.chip{
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  border:1px solid var(--rule); padding:4px 8px; border-radius:2px; color:var(--graphite);
+  transition:border-color .25s, color .25s;
+}
+.feat:hover .chip{ border-color:rgba(229,98,43,.4); color:var(--amber-dk) }
+
+.viz{ height:118px; border:1px solid var(--rule); background:var(--paper); border-radius:2px; overflow:hidden }
+.viz svg{ display:block; width:100%; height:100% }
+
+/* ---------- HOW IT WORKS ---------- */
+.how{ background:var(--paper); border-top:1px solid var(--rule); border-bottom:1px solid var(--rule) }
+.steps{ display:grid }
+@media(min-width:860px){ .steps{ grid-template-columns:repeat(4,1fr) } }
+.step{ padding:32px 0 34px; border-top:1px solid var(--rule) }
+.step:first-child{ border-top-color:var(--ink) }
+@media(min-width:860px){
+  .step{ padding-right:32px; border-top:1px solid var(--ink) }
+}
+.step .sn{
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em; color:var(--graphite);
+  display:flex; align-items:center; gap:9px; margin-bottom:16px;
+}
+.step .sn::before{
+  content:""; width:9px; height:9px; border:1.5px solid var(--ink); border-radius:50%;
+  background:var(--paper); flex:none;
+  transition:background .3s, border-color .3s, transform .3s;
+}
+.step:hover .sn::before{ background:var(--amber); border-color:var(--amber); transform:scale(1.3) }
+.step h3{ margin-bottom:12px }
+.step p{ color:var(--graphite); font-size:14.5px; line-height:1.62 }
+.step .code{
+  margin-top:16px; font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+  background:var(--bone-2); border:1px solid var(--rule); border-radius:2px;
+  padding:9px 11px; overflow-x:auto; white-space:nowrap;
+}
+.step .code s{ color:var(--mute); text-decoration:none }
+.step .code em{ color:var(--amber-dk); font-style:normal }
+
+/* ---------- PRICING ---------- */
+.pricehead{ justify-self:end; display:flex; align-items:center; flex-wrap:wrap }
+.tiers{ display:grid; border-top:1px solid var(--ink) }
+@media(min-width:920px){ .tiers{ grid-template-columns:repeat(3,1fr) } }
+.tier{ padding:34px 0 36px; border-bottom:1px solid var(--rule); position:relative }
+@media(min-width:920px){
+  .tier{ padding:34px 30px 36px; border-left:1px solid var(--rule); border-bottom:0 }
+  .tier:first-child{ border-left:0; padding-left:0 }
+  .tier:last-child{ padding-right:0 }
+  .tier.hot{ margin-top:-14px; padding-top:48px }
+}
+.tier.hot{ background:var(--paper); box-shadow:0 -2px 0 var(--amber) inset }
+.tier .flag{
+  position:absolute; top:0; right:0; font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
+  text-transform:uppercase; background:var(--amber); color:#fff; padding:4px 9px;
+}
+.tier .tn{ font-family:var(--mono); font-size:11.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--graphite) }
+.price{ display:flex; align-items:baseline; gap:6px; margin:18px 0 6px; flex-wrap:wrap }
+.price .cur{ font-size:20px; color:var(--graphite); font-weight:500 }
+.price .amt{
+  font-size:clamp(46px,5.4vw,60px); letter-spacing:-.045em; line-height:.9;
+  font-weight:520; font-variant-numeric:tabular-nums;
+}
+.price .per{ font-family:var(--mono); font-size:11.5px; color:var(--mute); letter-spacing:.05em }
+.tier .sub{ font-size:14px; color:var(--graphite); line-height:1.5; max-width:34ch }
+@media(min-width:920px){ .tier .sub{ min-height:4.4em } }
+.tier ul{ list-style:none; margin:26px 0 30px; padding:0; display:grid; gap:11px }
+.tier li{ display:flex; gap:11px; font-size:14.5px; color:var(--ink-2); line-height:1.5 }
+.tier li svg{ flex:none; margin-top:5px }
+.tier li b{ font-weight:560 }
+.tier .btn{ width:100%; justify-content:space-between }
+
+.toggle{ display:inline-flex; border:1px solid var(--rule); border-radius:2px; overflow:hidden; background:var(--paper) }
+.toggle button{
+  font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+  padding:9px 15px; border:0; background:none; color:var(--graphite); cursor:pointer;
+  transition:background .25s, color .25s;
+}
+.toggle button[aria-pressed="true"]{ background:var(--ink); color:var(--bone) }
+.toggle button:focus-visible{ outline:2px solid var(--amber); outline-offset:-2px }
+.savepill{
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--amber-dk); margin-left:12px;
+}
+
+/* ---------- FOOTER ---------- */
+footer{ background:var(--ink); color:var(--bone); position:relative; z-index:1 }
+.f-top{ padding:clamp(52px,7vw,80px) 0 44px; display:grid; gap:44px }
+@media(min-width:860px){ .f-top{ grid-template-columns:1.4fr 1fr 1fr 1fr; gap:40px } }
+.f-brand b{ font-size:19px; letter-spacing:-.025em }
+.f-brand p{ color:rgba(232,230,223,.5); font-size:14px; margin-top:14px; max-width:30ch; line-height:1.6 }
+.f-col h4{
+  margin:0 0 16px; font-family:var(--mono); font-size:10px; letter-spacing:.18em;
+  text-transform:uppercase; color:rgba(232,230,223,.42); font-weight:500;
+}
+.f-col a{
+  display:block; padding:6px 0; font-size:14.5px; color:rgba(232,230,223,.72);
+  transition:color .2s, transform .25s cubic-bezier(.2,.7,.2,1);
+}
+.f-col a:hover{ color:var(--amber); transform:translateX(4px) }
+.f-bot{
+  border-top:1px solid rgba(232,230,223,.13); padding:20px 0 32px;
+  display:flex; flex-wrap:wrap; gap:14px 26px; align-items:center;
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:rgba(232,230,223,.42);
+}
+.f-bot .stat{ display:flex; align-items:center; gap:8px; margin-left:auto }
+.f-bot .stat i{ width:6px;height:6px;border-radius:50%;background:#6FBF7F; display:block }
+
+a:focus-visible, button:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; border-radius:2px }
+
+/* reveal on scroll */
+.rv{ opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1) }
+.rv.in{ opacity:1; transform:none }
+</style>
+</head>
+<body>
+
+<div class="ledger" aria-hidden="true">
+  <div class="cols">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+  </div>
+</div>
+
+<header id="hdr">
+  <div class="wrap">
+    <div class="nav">
+      <a class="brand" href="#top" aria-label="Nordveil home">
+        <svg class="mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="22" height="22" rx="2" stroke="#14161A" stroke-width="1.4"/>
+          <path d="M5 16.5 L9 9 L13 14 L15.5 10.5 L19 15" stroke="#E5622B" stroke-width="1.6" stroke-linecap="square"/>
+          <path d="M5 19.6 H19" stroke="#14161A" stroke-width="1.2" opacity=".35"/>
+        </svg>
+        <b>Nordveil</b>
+        <span class="tag">v4.2</span>
+      </a>
+
+      <div class="navlinks">
+        <a href="#signal"  data-i="01">Signal</a>
+        <a href="#method"  data-i="02">Method</a>
+        <a href="#pricing" data-i="03">Pricing</a>
+        <a href="#docs"    data-i="04">Docs</a>
+      </div>
+
+      <a class="btn" href="#pricing"><span>Start trial</span><span class="arw" aria-hidden="true">→</span></a>
+
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="drawer" aria-label="Toggle menu"><i></i></button>
+    </div>
+  </div>
+
+  <div class="drawer" id="drawer">
+    <div><div class="wrap">
+      <nav>
+        <a href="#signal"><i>01</i>Signal</a>
+        <a href="#method"><i>02</i>Method</a>
+        <a href="#pricing"><i>03</i>Pricing</a>
+        <a href="#docs"><i>04</i>Docs</a>
+        <a class="btn" href="#pricing"><span>Start trial</span><span class="arw" aria-hidden="true">→</span></a>
+      </nav>
+    </div></div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ 01 · HERO ============ -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">
+          <span class="pulse" aria-hidden="true"></span>
+          <span class="label">Infrastructure telemetry · built for 10–80 engineers</span>
+        </div>
+
+        <h1>
+          Your stack is<br>
+          already telling you.<br>
+          <span class="mark-amber">We make it</span> <span class="dim">audible.</span>
+        </h1>
+
+        <div class="hero-copy">
+          <p class="lede">
+            Nordveil reads every host, container and queue you run — then stays quiet
+            until something actually deserves waking someone. One agent. No sampling.
+            No per-seat tax on the people who fix things at 3am.
+          </p>
+
+          <div class="hero-cta">
+            <a class="btn" href="#pricing"><span>Start 21-day trial</span><span class="arw" aria-hidden="true">→</span></a>
+            <span class="cta-note">No card · 4-minute install · SOC 2 Type II</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" aria-hidden="true">
+        <div class="panel-top">
+          <span class="dot"></span>
+          <span>eu-north-1 · ingest</span>
+          <span class="r" id="clock">--:--:--</span>
+        </div>
+        <canvas id="wave" width="600" height="172"></canvas>
+        <div class="panel-foot">
+          <div><div class="k">p99 latency</div><div class="v" id="m1">128<span style="font-size:12px">ms</span></div></div>
+          <div><div class="k">series/sec</div><div class="v">1.24<span style="font-size:12px">M</span></div></div>
+          <div><div class="k">open alerts</div><div class="v on" id="m3">2</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 · SOCIAL PROOF ============ -->
+<div class="logos">
+  <div class="wrap">
+    <span class="lbl">Running in production at</span>
+    <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 8h7" stroke="currentColor" stroke-width="1.4"/></svg><span>Kolstad</span></span>
+    <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14.5 14H1.5z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span>Faraday Rail</span></span>
+    <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="6" y="6" width="4" height="4" fill="currentColor"/></svg><span>Meridian Pay</span></span>
+    <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 12 6 4l4 8 4-8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span>Vantably</span></span>
+    <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.4" fill="currentColor"/><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="3 2.6"/></svg><span>Orbital Health</span></span>
+  </div>
+</div>
+
+<div class="strip">
+  <div class="wrap">
+    <div class="metric"><div class="n" data-to="94">0<em>%</em></div><div class="c">of pages resolved before a customer noticed</div></div>
+    <div class="metric"><div class="n" data-to="4">0<em>m</em></div><div class="c">median time from install to first dashboard</div></div>
+    <div class="metric"><div class="n" data-to="61">0<em>%</em></div><div class="c">fewer alerts than the tool teams switch from</div></div>
+    <div class="metric"><div class="n" data-to="13">0<em>ms</em></div><div class="c">agent overhead per host at full resolution</div></div>
+  </div>
+</div>
+
+<!-- ============ 03 · FEATURES ============ -->
+<section class="sec" id="signal">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="idx">01 <b>/ SIGNAL</b></div>
+      <h2>Three things<br>most monitoring<br>gets wrong.</h2>
+      <p class="lede">We built Nordveil after a decade of on-call rotations where the tooling
+        was the second incident. Everything here exists to remove one specific 3am problem.</p>
+    </div>
+
+    <div class="feats">
+      <article class="feat rv">
+        <div class="fi">F.01 — CORRELATION</div>
+        <div>
+          <h3>Alerts that arrive already grouped</h3>
+          <p class="fd">When a node degrades, eleven checks fail. Nordveil ties them to one
+            causal root and pages once. <b>You get an incident, not a notification storm.</b></p>
+          <div class="chips"><span class="chip">Topology-aware</span><span class="chip">Dedupe</span><span class="chip">Root-cause rank</span></div>
+        </div>
+        <div class="viz">
+          <svg viewBox="0 0 260 118" preserveAspectRatio="none" aria-hidden="true">
+            <g stroke="#14161A" stroke-opacity=".22" stroke-width="1">
+              <path d="M30 20 L130 59"/><path d="M30 44 L130 59"/><path d="M30 68 L130 59"/>
+              <path d="M30 92 L130 59"/><path d="M30 106 L130 59"/>
+            </g>
+            <path d="M130 59 L222 59" stroke="#E5622B" stroke-width="1.8"/>
+            <g fill="#14161A" fill-opacity=".3">
+              <circle cx="30" cy="20" r="3"/><circle cx="30" cy="44" r="3"/><circle cx="30" cy="68" r="3"/>
+              <circle cx="30" cy="92" r="3"/><circle cx="30" cy="106" r="3"/>
+            </g>
+            <circle cx="130" cy="59" r="6.5" fill="none" stroke="#E5622B" stroke-width="1.8"/>
+            <rect x="222" y="53" width="12" height="12" fill="#E5622B"/>
+          </svg>
+        </div>
+      </article>
+
+      <article class="feat rv">
+        <div class="fi">F.02 — RESOLUTION</div>
+        <div>
+          <h3>Full-fidelity history, not averages</h3>
+          <p class="fd">Most vendors roll your data up after 24 hours, so the spike you are
+            investigating on Monday no longer exists. We keep <b>every raw sample for 15 months</b>,
+            queryable at one-second granularity.</p>
+          <div class="chips"><span class="chip">1s resolution</span><span class="chip">15-month retention</span><span class="chip">No rollups</span></div>
+        </div>
+        <div class="viz">
+          <svg viewBox="0 0 260 118" preserveAspectRatio="none" aria-hidden="true">
+            <g stroke="#14161A" stroke-opacity=".13" stroke-width="1">
+              <path d="M0 30 H260"/><path d="M0 60 H260"/><path d="M0 90 H260"/>
+            </g>
+            <path d="M8 78 L20 70 L32 82 L44 64 L56 74 L68 60 L80 71 L92 55 L104 66 L116 24 L128 68 L140 58 L152 72 L164 52 L176 66 L188 46 L200 70 L212 54 L224 74 L236 60 L248 76"
+                  fill="none" stroke="#E5622B" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M8 74 C60 70, 100 62, 130 58 C170 54, 210 62, 248 66"
+                  fill="none" stroke="#14161A" stroke-opacity=".3" stroke-width="1.4" stroke-dasharray="4 3"/>
+            <circle cx="116" cy="24" r="3.4" fill="#E5622B"/>
+          </svg>
+        </div>
+      </article>
+
+      <article class="feat rv">
+        <div class="fi">F.03 — COST</div>
+        <div>
+          <h3>Priced on hosts, never on humans</h3>
+          <p class="fd">Per-seat billing punishes you for inviting the one person who can fix it.
+            <b>Invite the whole company.</b> Your bill only moves when your infrastructure does.</p>
+          <div class="chips"><span class="chip">Unlimited seats</span><span class="chip">Flat host rate</span><span class="chip">No egress fees</span></div>
+        </div>
+        <div class="viz">
+          <svg viewBox="0 0 260 118" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 96 H260" stroke="#14161A" stroke-opacity=".13"/>
+            <path d="M20 96 C90 96, 150 40, 240 14" fill="none" stroke="#14161A" stroke-opacity=".28" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <path d="M20 96 H240" fill="none" stroke="#E5622B" stroke-width="2"/>
+            <text x="20" y="30" font-family="ui-monospace,monospace" font-size="9" fill="#14161A" fill-opacity=".38" letter-spacing="1">PER-SEAT</text>
+            <text x="20" y="88" font-family="ui-monospace,monospace" font-size="9" fill="#C24C1B" letter-spacing="1">NORDVEIL</text>
+            <text x="196" y="112" font-family="ui-monospace,monospace" font-size="8" fill="#14161A" fill-opacity=".28" letter-spacing="1">TEAM SIZE →</text>
+          </svg>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 · HOW IT WORKS ============ -->
+<section class="sec how" id="method">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="idx">02 <b>/ METHOD</b></div>
+      <h2>Four minutes,<br>start to signal.</h2>
+      <p class="lede">No collector fleet to design, no YAML archaeology. The agent discovers
+        what you run and proposes the alerts a team your size normally writes by hand.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step rv">
+        <div class="sn">STEP 01</div>
+        <h3>Drop the agent</h3>
+        <p>One static binary, 11 MB, no runtime dependency. Ships as a DaemonSet, a systemd unit, or a Nomad job.</p>
+        <div class="code"><s>$</s> curl -sSf nordveil.sh | <em>sh</em></div>
+      </div>
+      <div class="step rv">
+        <div class="sn">STEP 02</div>
+        <h3>It maps itself</h3>
+        <p>Service topology, dependency edges and ownership are inferred from live traffic — you never declare them.</p>
+        <div class="code"><s>→</s> 148 hosts · 31 svc · <em>0 config</em></div>
+      </div>
+      <div class="step rv">
+        <div class="sn">STEP 03</div>
+        <h3>Baselines settle</h3>
+        <p>Thirty minutes of traffic is enough to learn normal. Weekday seasonality lands within the first week.</p>
+        <div class="code"><s>→</s> baseline <em>ready</em> · σ 0.31</div>
+      </div>
+      <div class="step rv">
+        <div class="sn">STEP 04</div>
+        <h3>It pages you once</h3>
+        <p>Routing follows the ownership graph it built. The right person, the first time, with the causal chain attached.</p>
+        <div class="code"><s>→</s> pager: <em>@team-payments</em></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 · PRICING ============ -->
+<section class="sec" id="pricing">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="idx">03 <b>/ PRICING</b></div>
+      <h2>Per host.<br>Never per person.</h2>
+      <div class="pricehead">
+        <div class="toggle" role="group" aria-label="Billing period">
+          <button id="bMonthly" aria-pressed="true">Monthly</button>
+          <button id="bYearly"  aria-pressed="false">Yearly</button>
+        </div>
+        <span class="savepill" id="savePill" hidden>— 2 months free</span>
+      </div>
+    </div>
+
+    <div class="tiers">
+      <div class="tier rv">
+        <div class="tn">Signal</div>
+        <div class="price"><span class="cur">$</span><span class="amt" data-m="14" data-y="12">14</span><span class="per">/host/mo</span></div>
+        <p class="sub">For teams under 25 hosts who want one honest dashboard, not a platform.</p>
+        <ul>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span><b>15-month</b> raw retention</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span>Unlimited seats &amp; dashboards</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span>Slack, PagerDuty, webhook routing</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span>Community support</span></li>
+        </ul>
+        <a class="btn ghost" href="#"><span>Start trial</span><span class="arw" aria-hidden="true">→</span></a>
+      </div>
+
+      <div class="tier hot rv">
+        <span class="flag">Most teams</span>
+        <div class="tn">Rotation</div>
+        <div class="price"><span class="cur">$</span><span class="amt" data-m="29" data-y="24">29</span><span class="per">/host/mo</span></div>
+        <p class="sub">The full on-call surface: correlation, ownership routing and incident review.</p>
+        <ul>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#E5622B" stroke-width="1.7" fill="none"/></svg><span>Everything in <b>Signal</b></span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#E5622B" stroke-width="1.7" fill="none"/></svg><span><b>Causal grouping</b> &amp; root-cause rank</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#E5622B" stroke-width="1.7" fill="none"/></svg><span>Auto-generated topology map</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#E5622B" stroke-width="1.7" fill="none"/></svg><span>SLO tracking + error budgets</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#E5622B" stroke-width="1.7" fill="none"/></svg><span>Postmortem timelines</span></li>
+        </ul>
+        <a class="btn" href="#"><span>Start trial</span><span class="arw" aria-hidden="true">→</span></a>
+      </div>
+
+      <div class="tier rv">
+        <div class="tn">Continuum</div>
+        <div class="price"><span class="amt" style="font-size:clamp(34px,3.6vw,42px)">Custom</span></div>
+        <p class="sub">Regulated environments, air-gapped installs, or fleets past 500 hosts.</p>
+        <ul>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span>Everything in <b>Rotation</b></span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span>Self-hosted / air-gapped deploy</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span>SSO, SCIM, audit export</span></li>
+          <li><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.4 4.6 9 10 3" stroke="#3F5A46" stroke-width="1.7" fill="none"/></svg><span><b>99.95%</b> SLA, named engineer</span></li>
+        </ul>
+        <a class="btn ghost" href="#"><span>Talk to us</span><span class="arw" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ 06 · FOOTER ============ -->
+<footer id="docs">
+  <div class="wrap">
+    <div class="f-top">
+      <div class="f-brand">
+        <b>Nordveil</b>
+        <p>Infrastructure monitoring that stays quiet until it matters. Built in Gothenburg, on-call everywhere.</p>
+      </div>
+      <div class="f-col">
+        <h4>Product</h4>
+        <a href="#signal">Correlation engine</a>
+        <a href="#method">Agent &amp; install</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#">Changelog</a>
+      </div>
+      <div class="f-col">
+        <h4>Developers</h4>
+        <a href="#">Documentation</a>
+        <a href="#">API reference</a>
+        <a href="#">Query language</a>
+        <a href="#">Status page</a>
+      </div>
+      <div class="f-col">
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Security &amp; SOC 2</a>
+        <a href="#">Careers</a>
+        <a href="#">Contact</a>
+      </div>
+    </div>
+    <div class="f-bot">
+      <span>© 2026 Nordveil AB</span>
+      <span>Org. 559214-8830</span>
+      <span>Privacy</span>
+      <span>Terms</span>
+      <span class="stat"><i></i> All systems nominal</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- sticky header state ---- */
+  var hdr = document.getElementById('hdr');
+  function onScroll(){ hdr.classList.toggle('stuck', window.scrollY > 8); }
+  onScroll();
+  window.addEventListener('scroll', onScroll, {passive:true});
+
+  /* ---- mobile drawer ---- */
+  var burger = document.getElementById('burger'),
+      drawer = document.getElementById('drawer');
+  burger.addEventListener('click', function(){
+    var open = burger.getAttribute('aria-expanded') === 'true';
+    burger.setAttribute('aria-expanded', String(!open));
+    drawer.classList.toggle('open', !open);
+  });
+  drawer.addEventListener('click', function(e){
+    if(e.target.closest('a')){
+      burger.setAttribute('aria-expanded','false');
+      drawer.classList.remove('open');
+    }
+  });
+
+  /* ---- reveal on scroll ---- */
+  var rv = [].slice.call(document.querySelectorAll('.rv'));
+  if(reduce || !('IntersectionObserver' in window)){
+    rv.forEach(function(el){ el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, {rootMargin:'0px 0px -6% 0px', threshold:.06});
+    rv.forEach(function(el, i){
+      el.style.transitionDelay = (Math.min(i,4)*55) + 'ms';
+      io.observe(el);
+    });
+  }
+
+  /* ---- metric count-up ---- */
+  var metrics = [].slice.call(document.querySelectorAll('.metric .n'));
+  function countUp(el){
+    var to = parseInt(el.getAttribute('data-to'), 10),
+        em = el.querySelector('em'),
+        suffix = em ? em.outerHTML : '';
+    if(reduce || !window.requestAnimationFrame){ el.innerHTML = to + suffix; return; }
+    var t0 = performance.now(), dur = 900;
+    (function tick(now){
+      var p = Math.min((now - t0)/dur, 1), e = 1 - Math.pow(1-p, 3);
+      el.innerHTML = Math.round(to*e) + suffix;
+      if(p < 1) requestAnimationFrame(tick);
+    })(t0);
+  }
+  if('IntersectionObserver' in window){
+    var mo = new IntersectionObserver(function(es){
+      es.forEach(function(en){ if(en.isIntersecting){ countUp(en.target); mo.unobserve(en.target); } });
+    }, {threshold:.5});
+    metrics.forEach(function(el){ mo.observe(el); });
+  } else {
+    metrics.forEach(countUp);
+  }
+
+  /* ---- pricing period toggle ---- */
+  var bM = document.getElementById('bMonthly'),
+      bY = document.getElementById('bYearly'),
+      pill = document.getElementById('savePill'),
+      amts = [].slice.call(document.querySelectorAll('.amt[data-m]'));
+  function setPeriod(yearly){
+    bM.setAttribute('aria-pressed', String(!yearly));
+    bY.setAttribute('aria-pressed', String(yearly));
+    pill.hidden = !yearly;
+    amts.forEach(function(el){ el.textContent = el.getAttribute(yearly ? 'data-y' : 'data-m'); });
+  }
+  bM.addEventListener('click', function(){ setPeriod(false); });
+  bY.addEventListener('click', function(){ setPeriod(true); });
+
+  /* ---- hero waveform on graph paper: the memorable element ---- */
+  var cv = document.getElementById('wave');
+  if(cv && cv.getContext){
+    var ctx = cv.getContext('2d'), W = 0, H = 0;
+    var N = 150, data = [], t = 0, spike = -1, running = true;
+    for(var i=0;i<N;i++) data.push(0.5);
+
+    function resize(){
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = cv.clientWidth || 600; H = cv.clientHeight || 172;
+      cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function step(){
+      t += 0.055;
+      var base = 0.5
+        + Math.sin(t)*0.13
+        + Math.sin(t*2.37 + 1.1)*0.07
+        + Math.sin(t*0.41)*0.05
+        + (Math.random()-0.5)*0.055;
+      if(spike < 0 && Math.random() < 0.006) spike = 9;
+      if(spike >= 0){ base += 0.30 * (spike/9); spike--; }
+      data.push(Math.max(0.04, Math.min(0.96, base)));
+      if(data.length > N) data.shift();
+    }
+
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+
+      ctx.strokeStyle = 'rgba(20,22,26,.07)'; ctx.lineWidth = 1;
+      for(var y=1;y<4;y++){ var yy=Math.round(H*y/4)+.5; ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(W,yy); ctx.stroke(); }
+      for(var x=1;x<10;x++){ var xx=Math.round(W*x/10)+.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); }
+
+      ctx.strokeStyle='rgba(229,98,43,.35)'; ctx.setLineDash([4,4]);
+      var ty=Math.round(H*0.19)+.5; ctx.beginPath(); ctx.moveTo(0,ty); ctx.lineTo(W,ty); ctx.stroke();
+      ctx.setLineDash([]);
+
+      var stepX = W/(N-1), pts = [];
+      for(var i=0;i<data.length;i++) pts.push([i*stepX, H - data[i]*H*0.86 - H*0.07]);
+
+      ctx.beginPath(); ctx.moveTo(pts[0][0], H);
+      for(var j=0;j<pts.length;j++) ctx.lineTo(pts[j][0], pts[j][1]);
+      ctx.lineTo(pts[pts.length-1][0], H); ctx.closePath();
+      var g = ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,'rgba(229,98,43,.16)'); g.addColorStop(1,'rgba(229,98,43,0)');
+      ctx.fillStyle = g; ctx.fill();
+
+      ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+      for(var k=1;k<pts.length;k++) ctx.lineTo(pts[k][0], pts[k][1]);
+      ctx.strokeStyle='#E5622B'; ctx.lineWidth=1.6; ctx.lineJoin='round'; ctx.stroke();
+
+      var last = pts[pts.length-1];
+      ctx.beginPath(); ctx.arc(last[0]-1, last[1], 3, 0, Math.PI*2);
+      ctx.fillStyle='#E5622B'; ctx.fill();
+      ctx.beginPath(); ctx.arc(last[0]-1, last[1], 6.5, 0, Math.PI*2);
+      ctx.strokeStyle='rgba(229,98,43,.35)'; ctx.lineWidth=1; ctx.stroke();
+    }
+
+    var m1 = document.getElementById('m1'),
+        m3 = document.getElementById('m3'),
+        clock = document.getElementById('clock'),
+        frames = 0;
+
+    function pad(n){ return (n<10?'0':'') + n; }
+
+    function loop(){
+      if(!running) return;
+      step(); draw();
+      if(++frames % 18 === 0){
+        var v = Math.round(96 + data[data.length-1]*120);
+        m1.innerHTML = v + '<span style="font-size:12px">ms</span>';
+        var d = new Date();
+        clock.textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+        m3.textContent = data[data.length-1] > 0.72 ? '3' : '2';
+      }
+      requestAnimationFrame(loop);
+    }
+
+    if(reduce || !window.requestAnimationFrame){
+      for(var s=0;s<N;s++) step();
+      draw();
+      var dn = new Date();
+      clock.textContent = pad(dn.getHours())+':'+pad(dn.getMinutes())+':'+pad(dn.getSeconds());
+    } else {
+      loop();
+      document.addEventListener('visibilitychange', function(){
+        if(document.hidden){ running = false; }
+        else if(!running){ running = true; requestAnimationFrame(loop); }
+      });
+    }
+  }
+})();
+</script>
+</body>
+</html>

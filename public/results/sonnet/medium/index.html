@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nordveil — Infrastructure monitoring for mid-size engineering teams</title>
+<style>
+  :root{
+    --bg:#0f1216;
+    --bg-2:#151a20;
+    --ink:#e8ebee;
+    --ink-dim:#9aa4ae;
+    --line:#2a323b;
+    --signal:#ffb03a;      /* amber signal */
+    --healthy:#3fd0a8;     /* teal healthy */
+    --rail-w:64px;
+    --maxw:1180px;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{font-weight:650;letter-spacing:-0.02em;line-height:1.05}
+
+  /* ---------- measurement rail ---------- */
+  .rail{
+    position:fixed;top:0;left:0;bottom:0;width:var(--rail-w);
+    border-right:1px solid var(--line);
+    background:var(--bg);
+    z-index:50;
+    display:flex;flex-direction:column;align-items:center;
+    padding-top:18px;
+  }
+  .rail .mark{color:var(--signal);font-family:var(--mono);font-size:11px;font-weight:700;
+    writing-mode:vertical-rl;text-orientation:mixed;letter-spacing:0.25em}
+  .rail .ticks{flex:1;width:100%;position:relative;margin-top:24px;
+    background-image:repeating-linear-gradient(to bottom,var(--line) 0 1px,transparent 1px 14px);
+    opacity:.5}
+  .rail .status{writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--mono);
+    font-size:10px;color:var(--healthy);letter-spacing:0.2em;padding-bottom:18px}
+  .rail .status::before{content:"● ";}
+
+  .shell{margin-left:var(--rail-w)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,64px)}
+
+  /* section frame with number annotation ---------- */
+  section{border-bottom:1px solid var(--line);position:relative}
+  .sec-num{
+    font-family:var(--mono);font-size:11px;color:var(--ink-dim);
+    letter-spacing:0.3em;padding:20px 0 0;display:block
+  }
+  .sec-num b{color:var(--signal);font-weight:700}
+
+  /* asymmetric grid: wide + annotation ---------- */
+  .split{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:clamp(24px,5vw,72px)}
+  .anno{font-family:var(--mono);font-size:12.5px;color:var(--ink-dim);line-height:1.7;
+    border-left:1px solid var(--line);padding-left:20px}
+  .anno .k{color:var(--healthy)}
+
+  /* ---------- nav ---------- */
+  header{position:sticky;top:0;z-index:40;background:rgba(15,18,22,.85);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-0.03em;font-size:17px}
+  .logo svg{display:block}
+  .nav-links{display:flex;gap:30px;font-size:14px;color:var(--ink-dim);font-family:var(--mono)}
+  .nav-links a{position:relative;padding:4px 0;transition:color .18s}
+  .nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:0;height:1px;
+    background:var(--signal);transition:right .22s ease}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-links a:hover::after{right:0}
+  .nav .cta{font-family:var(--mono);font-size:13px;border:1px solid var(--line);
+    padding:8px 16px;color:var(--ink);transition:border-color .18s,background .18s}
+  .nav .cta:hover{border-color:var(--signal);background:rgba(255,176,58,.08)}
+  .burger{display:none;background:none;border:1px solid var(--line);color:var(--ink);
+    width:40px;height:36px;font-family:var(--mono);cursor:pointer}
+
+  /* ---------- hero ---------- */
+  .hero{padding:clamp(48px,9vw,110px) 0 clamp(56px,10vw,120px)}
+  .hero h1{font-size:clamp(2.6rem,6.2vw,4.7rem)}
+  .hero .lede{margin-top:26px;font-size:clamp(1.05rem,2vw,1.3rem);color:var(--ink-dim);max-width:34ch}
+  .hero .cta-row{margin-top:38px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .btn{
+    font-family:var(--mono);font-size:14px;letter-spacing:0.02em;
+    background:var(--signal);color:#1a1206;padding:14px 26px;font-weight:700;
+    display:inline-flex;align-items:center;gap:10px;
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  .btn .arw{transition:transform .18s ease}
+  .btn:hover{transform:translateY(-2px);box-shadow:-6px 6px 0 var(--line)}
+  .btn:hover .arw{transform:translateX(4px)}
+  .hero .note{font-family:var(--mono);font-size:12px;color:var(--ink-dim)}
+
+  /* hero visual: fake signal chart, CSS only */
+  .scope{
+    margin-top:4px;border:1px solid var(--line);background:var(--bg-2);
+    padding:18px;position:relative;overflow:hidden
+  }
+  .scope .head{display:flex;justify-content:space-between;font-family:var(--mono);
+    font-size:11px;color:var(--ink-dim);margin-bottom:14px}
+  .scope .head .ok{color:var(--healthy)}
+  .scope .plot{height:170px;position:relative;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),
+                     linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:100% 34px, 44px 100%;background-position:0 0;opacity:1}
+  .scope .plot::before{
+    content:"";position:absolute;inset:0;
+    background:
+      linear-gradient(90deg,transparent,transparent);
+  }
+  .wave{position:absolute;left:0;right:0;bottom:0;height:100%}
+  .wave path{fill:none;stroke:var(--healthy);stroke-width:2}
+  .wave .fill{fill:rgba(63,208,168,.10);stroke:none}
+  .blip{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--signal);
+    box-shadow:0 0 0 0 rgba(255,176,58,.5);animation:ping 2.4s ease-out infinite}
+  @keyframes ping{
+    0%{box-shadow:0 0 0 0 rgba(255,176,58,.5)}
+    70%{box-shadow:0 0 0 14px rgba(255,176,58,0)}
+    100%{box-shadow:0 0 0 0 rgba(255,176,58,0)}
+  }
+  .scan{position:absolute;top:0;bottom:0;width:2px;background:linear-gradient(var(--signal),transparent);
+    left:-2px;animation:sweep 5s linear infinite;opacity:.7}
+  @keyframes sweep{from{left:-2px}to{left:100%}}
+
+  /* ---------- social proof / metric strip ---------- */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
+  .metrics .m{padding:34px clamp(14px,3vw,28px);border-right:1px solid var(--line)}
+  .metrics .m:last-child{border-right:none}
+  .metrics .val{font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:650;letter-spacing:-0.03em}
+  .metrics .val .u{color:var(--signal);font-size:.55em;vertical-align:super;margin-left:2px}
+  .metrics .lab{font-family:var(--mono);font-size:11px;color:var(--ink-dim);
+    letter-spacing:0.15em;margin-top:8px;text-transform:uppercase}
+  .proof-line{padding:22px 0;font-family:var(--mono);font-size:12px;color:var(--ink-dim);
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .proof-line .co{color:var(--ink);border:1px solid var(--line);padding:5px 12px}
+
+  /* ---------- features ---------- */
+  .feat{padding:clamp(44px,7vw,86px) 0}
+  .feat h2{font-size:clamp(1.9rem,4vw,2.9rem);max-width:16ch}
+  .flist{margin-top:52px;display:grid;grid-template-columns:1fr;gap:0}
+  .frow{
+    display:grid;grid-template-columns:56px minmax(0,1fr) minmax(0,1.1fr);
+    gap:clamp(16px,4vw,48px);padding:30px 0;border-top:1px solid var(--line);
+    align-items:start;transition:background .2s
+  }
+  .frow:last-child{border-bottom:1px solid var(--line)}
+  .frow:hover{background:var(--bg-2)}
+  .frow:hover .fi svg{stroke:var(--signal);transform:rotate(-6deg)}
+  .fi svg{stroke:var(--ink);transition:stroke .2s,transform .25s ease}
+  .frow h3{font-size:1.3rem}
+  .frow p{color:var(--ink-dim);margin-top:10px;font-size:.98rem}
+  .frow .tag{font-family:var(--mono);font-size:11px;color:var(--healthy);letter-spacing:0.15em}
+
+  /* ---------- how it works ---------- */
+  .how{padding:clamp(44px,7vw,86px) 0}
+  .how h2{font-size:clamp(1.9rem,4vw,2.9rem)}
+  .steps{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line)}
+  .step{padding:28px 24px;border-right:1px solid var(--line);position:relative;min-height:220px;
+    transition:background .2s}
+  .step:last-child{border-right:none}
+  .step:hover{background:var(--bg-2)}
+  .step .n{font-family:var(--mono);font-size:12px;color:var(--signal);letter-spacing:0.2em}
+  .step h3{margin-top:14px;font-size:1.15rem}
+  .step p{margin-top:10px;color:var(--ink-dim);font-size:.94rem}
+  .step .bar{position:absolute;left:0;bottom:0;height:3px;width:33%;background:var(--signal)}
+  .step:nth-child(2) .bar{width:66%}
+  .step:nth-child(3) .bar{width:100%}
+
+  /* ---------- pricing ---------- */
+  .pricing{padding:clamp(44px,7vw,86px) 0}
+  .pricing h2{font-size:clamp(1.9rem,4vw,2.9rem)}
+  .tiers{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line)}
+  .tier{padding:30px 26px;border-right:1px solid var(--line);display:flex;flex-direction:column}
+  .tier:last-child{border-right:none}
+  .tier.mid{background:var(--bg-2);position:relative}
+  .tier.mid::before{content:"MOST DEPLOYED";position:absolute;top:0;left:0;right:0;
+    font-family:var(--mono);font-size:10px;letter-spacing:0.25em;color:#1a1206;
+    background:var(--signal);text-align:center;padding:5px}
+  .tier.mid .inner{margin-top:20px}
+  .tier .name{font-family:var(--mono);font-size:12px;letter-spacing:0.2em;color:var(--ink-dim)}
+  .tier .price{font-size:2.6rem;font-weight:650;letter-spacing:-0.03em;margin-top:14px}
+  .tier .price span{font-size:.9rem;color:var(--ink-dim);font-family:var(--mono);font-weight:400}
+  .tier ul{list-style:none;margin:22px 0;flex:1;display:flex;flex-direction:column;gap:12px}
+  .tier li{font-size:.92rem;color:var(--ink-dim);padding-left:22px;position:relative}
+  .tier li::before{content:"+";position:absolute;left:0;color:var(--healthy);font-family:var(--mono)}
+  .tier .pick{font-family:var(--mono);font-size:13px;text-align:center;padding:12px;
+    border:1px solid var(--line);transition:border-color .18s,background .18s,color .18s}
+  .tier .pick:hover{border-color:var(--signal);background:var(--signal);color:#1a1206}
+  .tier.mid .pick{background:var(--signal);color:#1a1206;border-color:var(--signal)}
+  .tier.mid .pick:hover{background:#1a1206;color:var(--signal)}
+
+  /* ---------- footer ---------- */
+  footer{padding:56px 0 40px}
+  .fgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
+  .fgrid h4{font-family:var(--mono);font-size:11px;letter-spacing:0.2em;color:var(--ink-dim);
+    text-transform:uppercase;margin-bottom:14px}
+  .fgrid a{display:block;font-size:.9rem;color:var(--ink-dim);padding:5px 0;transition:color .16s}
+  .fgrid a:hover{color:var(--signal)}
+  .fbot{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;
+    color:var(--ink-dim);flex-wrap:wrap;gap:12px}
+
+  /* reveal on scroll */
+  .rv{opacity:0;transform:translateY(18px);transition:opacity .5s ease,transform .5s ease}
+  .rv.in{opacity:1;transform:none}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:900px){
+    :root{--rail-w:34px}
+    .rail .status{display:none}
+    .split{grid-template-columns:1fr;gap:28px}
+    .anno{border-left:none;border-top:1px solid var(--line);padding-left:0;padding-top:16px}
+    .metrics{grid-template-columns:repeat(2,1fr)}
+    .metrics .m:nth-child(2){border-right:none}
+    .steps,.tiers{grid-template-columns:1fr}
+    .step,.tier{border-right:none;border-bottom:1px solid var(--line)}
+    .step:last-child,.tier:last-child{border-bottom:none}
+    .frow{grid-template-columns:40px 1fr}
+    .frow .fdesc{grid-column:2}
+    .fgrid{grid-template-columns:1fr 1fr}
+    .nav-links,.nav .cta{display:none}
+    .burger{display:block}
+    header.open .nav-links{display:flex;position:absolute;top:64px;left:0;right:0;
+      flex-direction:column;background:var(--bg);border-bottom:1px solid var(--line);
+      padding:16px clamp(20px,5vw,64px);gap:4px}
+    header.open .nav-links a{padding:12px 0;border-bottom:1px solid var(--line)}
+  }
+  @media (max-width:520px){
+    .metrics{grid-template-columns:1fr}
+    .metrics .m{border-right:none}
+    .fgrid{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .rv{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<aside class="rail" aria-hidden="true">
+  <span class="mark">NORDVEIL</span>
+  <div class="ticks"></div>
+  <span class="status">ALL SYSTEMS NOMINAL</span>
+</aside>
+
+<div class="shell">
+
+<header id="hdr">
+  <div class="wrap nav">
+    <a href="#" class="logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <rect x="1" y="1" width="20" height="20" stroke="#ffb03a" stroke-width="2"/>
+        <path d="M5 15 L9 8 L13 13 L17 5" stroke="#3fd0a8" stroke-width="2" fill="none"/>
+      </svg>
+      Nordveil
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#docs">Docs</a>
+    </nav>
+    <a href="#pricing" class="cta">Start trial →</a>
+    <button class="burger" id="burger" aria-label="Menu">≡</button>
+  </div>
+</header>
+
+<!-- 01 HERO -->
+<section id="top">
+  <div class="wrap">
+    <span class="sec-num"><b>01</b> — HERO</span>
+    <div class="hero split">
+      <div>
+        <h1>Your infrastructure, read like a single instrument.</h1>
+        <p class="lede">Nordveil correlates metrics, logs and traces into one signal — so a
+          10-person platform team sees the fault before the pager does.</p>
+        <div class="cta-row">
+          <a href="#pricing" class="btn">Start 14-day trial <span class="arw">→</span></a>
+          <span class="note">no card · deploy in ~9 min</span>
+        </div>
+      </div>
+      <div class="anno" aria-hidden="false">
+        <div class="scope">
+          <div class="head"><span>cluster-eu-1 / p99 latency</span><span class="ok">● healthy</span></div>
+          <div class="plot">
+            <svg class="wave" viewBox="0 0 300 170" preserveAspectRatio="none">
+              <path class="fill" d="M0,120 L20,110 L40,124 L60,90 L80,105 L100,70 L120,96 L140,80 L160,112 L180,64 L200,100 L220,86 L240,120 L260,72 L280,104 L300,88 L300,170 L0,170 Z"/>
+              <path d="M0,120 L20,110 L40,124 L60,90 L80,105 L100,70 L120,96 L140,80 L160,112 L180,64 L200,100 L220,86 L240,120 L260,72 L280,104 L300,88"/>
+            </svg>
+            <span class="scan"></span>
+            <span class="blip" style="left:60%;top:38%"></span>
+          </div>
+          <div class="head" style="margin:12px 0 0"><span>events/s 1.2k</span><span>err 0.01%</span><span>hosts 214</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 SOCIAL PROOF -->
+<section id="proof">
+  <div class="wrap">
+    <span class="sec-num"><b>02</b> — SIGNAL FROM THE FIELD</span>
+    <div class="metrics rv">
+      <div class="m"><div class="val">41<span class="u">%</span></div><div class="lab">Fewer paging alerts</div></div>
+      <div class="m"><div class="val">6.2<span class="u">min</span></div><div class="lab">Median time to root cause</div></div>
+      <div class="m"><div class="val">99.98<span class="u">%</span></div><div class="lab">Ingest uptime, trailing 12mo</div></div>
+      <div class="m"><div class="val">300<span class="u">+</span></div><div class="lab">Engineering teams monitoring</div></div>
+    </div>
+    <div class="proof-line rv">
+      <span>Trusted by platform teams at</span>
+      <span class="co">Halden Logistics</span>
+      <span class="co">Fjordpay</span>
+      <span class="co">Bytemark</span>
+      <span class="co">Otvel Health</span>
+      <span class="co">Grendel CI</span>
+    </div>
+  </div>
+</section>
+
+<!-- 03 FEATURES -->
+<section id="features">
+  <div class="wrap feat">
+    <span class="sec-num"><b>03</b> — WHAT IT DOES</span>
+    <h2>Three primitives. No dashboard sprawl.</h2>
+    <div class="flist">
+      <div class="frow rv">
+        <div class="fi">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke-width="2">
+            <circle cx="15" cy="15" r="12"/><path d="M15 6 v9 l6 4"/>
+          </svg>
+        </div>
+        <div>
+          <span class="tag">CORRELATE</span>
+          <h3>One timeline, all telemetry</h3>
+        </div>
+        <p class="fdesc">Metrics, logs and traces land on a shared clock. Click a latency spike and
+          the exact log lines and downstream spans are already selected — no tab-switching, no query
+          language to memorise.</p>
+      </div>
+      <div class="frow rv">
+        <div class="fi">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke-width="2">
+            <path d="M4 20 L12 10 L18 16 L26 6"/><path d="M4 26 h22"/>
+          </svg>
+        </div>
+        <div>
+          <span class="tag">DETECT</span>
+          <h3>Baselines that learn your traffic</h3>
+        </div>
+        <p class="fdesc">Nordveil models each service's normal shape per hour and per weekday, then
+          alerts on deviation — not on a static threshold someone set in 2021 and forgot.</p>
+      </div>
+      <div class="frow rv">
+        <div class="fi">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke-width="2">
+            <rect x="4" y="4" width="9" height="9"/><rect x="17" y="4" width="9" height="9"/>
+            <rect x="4" y="17" width="9" height="9"/><path d="M21.5 17 v9 M17 21.5 h9"/>
+          </svg>
+        </div>
+        <div>
+          <span class="tag">ROUTE</span>
+          <h3>Ownership-aware routing</h3>
+        </div>
+        <p class="fdesc">Every alert carries the owning team, the last deploy, and a suggested
+          runbook. It reaches the person who can fix it — and skips everyone who can't.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 HOW IT WORKS -->
+<section id="how">
+  <div class="wrap how">
+    <span class="sec-num"><b>04</b> — HOW IT WORKS</span>
+    <h2>From zero to signal in one afternoon.</h2>
+    <div class="steps rv">
+      <div class="step">
+        <span class="n">STEP 01</span>
+        <h3>Point an agent at your cluster</h3>
+        <p>One Helm chart or a single binary. It auto-discovers services and starts streaming
+          within minutes — no per-service instrumentation required to begin.</p>
+        <span class="bar"></span>
+      </div>
+      <div class="step">
+        <span class="n">STEP 02</span>
+        <h3>Let baselines settle</h3>
+        <p>Over the first 24–48 hours Nordveil learns each service's rhythm. You watch the
+          instrument fill in; nothing pages yet.</p>
+        <span class="bar"></span>
+      </div>
+      <div class="step">
+        <span class="n">STEP 03</span>
+        <h3>Wire routing & go live</h3>
+        <p>Map teams to services, connect Slack or PagerDuty, and flip detection on. The next
+          real incident arrives pre-triaged.</p>
+        <span class="bar"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 PRICING -->
+<section id="pricing">
+  <div class="wrap pricing">
+    <span class="sec-num"><b>05</b> — PRICING</span>
+    <h2>Priced per host. No seat tax.</h2>
+    <div class="tiers rv">
+      <div class="tier">
+        <div class="inner">
+          <div class="name">SIGNAL</div>
+          <div class="price">$0<span> / mo</span></div>
+          <ul>
+            <li>Up to 10 hosts</li>
+            <li>7-day retention</li>
+            <li>Metrics + logs</li>
+            <li>Community support</li>
+          </ul>
+          <a href="#" class="pick">Start free</a>
+        </div>
+      </div>
+      <div class="tier mid">
+        <div class="inner">
+          <div class="name">TEAM</div>
+          <div class="price">$18<span> / host / mo</span></div>
+          <ul>
+            <li>Unlimited hosts</li>
+            <li>30-day retention</li>
+            <li>Traces + learned baselines</li>
+            <li>Ownership-aware routing</li>
+            <li>Slack &amp; PagerDuty</li>
+          </ul>
+          <a href="#" class="pick">Start 14-day trial</a>
+        </div>
+      </div>
+      <div class="tier">
+        <div class="inner">
+          <div class="name">SCALE</div>
+          <div class="price">Custom</div>
+          <ul>
+            <li>13-month retention</li>
+            <li>SSO / SCIM / audit log</li>
+            <li>Dedicated ingest region</li>
+            <li>99.99% ingest SLA</li>
+            <li>Solutions engineer</li>
+          </ul>
+          <a href="#" class="pick">Talk to us</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 FOOTER -->
+<section>
+  <div class="wrap">
+    <span class="sec-num"><b>06</b> — FOOTER</span>
+    <footer id="docs">
+      <div class="fgrid">
+        <div>
+          <a href="#top" class="logo" style="font-size:16px">
+            <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+              <rect x="1" y="1" width="20" height="20" stroke="#ffb03a" stroke-width="2"/>
+              <path d="M5 15 L9 8 L13 13 L17 5" stroke="#3fd0a8" stroke-width="2"/>
+            </svg>
+            Nordveil
+          </a>
+          <p style="color:var(--ink-dim);font-size:.88rem;margin-top:14px;max-width:30ch">
+            Infrastructure monitoring for engineering teams that would rather ship than babysit dashboards.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#how">How it works</a><a href="#">Changelog</a>
+        </div>
+        <div>
+          <h4>Resources</h4>
+          <a href="#">Documentation</a><a href="#">API reference</a><a href="#">Status</a><a href="#">Security</a>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <a href="#">About</a><a href="#">Careers</a><a href="#">Contact</a><a href="#">Privacy</a>
+        </div>
+      </div>
+      <div class="fbot">
+        <span>© 2026 Nordveil Systems AS · Oslo</span>
+        <span>● all systems nominal</span>
+      </div>
+    </footer>
+  </div>
+</section>
+
+</div><!-- /shell -->
+
+<script>
+  // mobile menu
+  var burger = document.getElementById('burger');
+  var hdr = document.getElementById('hdr');
+  burger.addEventListener('click', function(){ hdr.classList.toggle('open'); });
+  hdr.querySelectorAll('.nav-links a').forEach(function(a){
+    a.addEventListener('click', function(){ hdr.classList.remove('open'); });
+  });
+
+  // scroll reveal
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:0.15});
+  document.querySelectorAll('.rv').forEach(function(el){ io.observe(el); });
+
+  // rail status reacts to scroll position — subtle console feel
+  var status = document.querySelector('.rail .status');
+  var labels = ['ALL SYSTEMS NOMINAL','SCANNING TELEMETRY','BASELINES LEARNING','ROUTING ARMED','READY TO DEPLOY','UPTIME 99.98%'];
+  var secs = document.querySelectorAll('section');
+  window.addEventListener('scroll', function(){
+    var i = 0;
+    secs.forEach(function(s, idx){ if(s.getBoundingClientRect().top < window.innerHeight*0.5) i = idx; });
+    if(status && status.textContent !== labels[i]) status.textContent = labels[i] || labels[0];
+  }, {passive:true});
+</script>
+
+</body>
+</html>

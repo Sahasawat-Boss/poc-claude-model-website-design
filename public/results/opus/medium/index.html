@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nordveil — Infrastructure monitoring for engineering teams</title>
+<style>
+/* ============================================================
+   NORDVEIL — instrument-panel landing page
+   Palette: ink navy / bone / amber signal / slate
+   ============================================================ */
+
+:root{
+  --ink:#0E1620;
+  --ink-2:#161F2B;
+  --ink-3:#1E2936;
+  --bone:#F2EFE9;
+  --bone-2:#E4DFD6;
+  --slate:#7E8894;
+  --slate-2:#5A6472;
+  --amber:#F0A202;
+  --amber-hi:#FFBE33;
+  --rule:rgba(242,239,233,.14);
+  --rule-strong:rgba(242,239,233,.28);
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"Helvetica Neue",Helvetica,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  --gut:clamp(20px,5vw,72px);
+  --maxw:1400px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ink);
+  color:var(--bone);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+img,svg{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* ---------- global hairline grid (the signature substrate) ---------- */
+.grid-substrate{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1;
+  max-width:var(--maxw);
+  margin:0 auto;
+  padding:0 var(--gut);
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+}
+.grid-substrate span{border-left:1px solid var(--rule)}
+.grid-substrate span:last-child{border-right:1px solid var(--rule)}
+@media(min-width:900px){
+  .grid-substrate{grid-template-columns:repeat(12,1fr)}
+}
+
+.shell{
+  position:relative;
+  z-index:2;
+  max-width:var(--maxw);
+  margin:0 auto;
+  padding:0 var(--gut);
+}
+
+/* ---------- type system: aggressive scale contrast ---------- */
+.label{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--slate);
+  font-weight:400;
+}
+.label .num{color:var(--amber)}
+
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.035em;line-height:.92}
+h1{font-size:clamp(52px,10.5vw,124px)}
+h2{font-size:clamp(36px,6vw,68px)}
+h3{font-size:clamp(20px,2.2vw,26px);line-height:1.15;letter-spacing:-.02em}
+p{margin:0}
+
+.lead{
+  font-size:clamp(16px,1.5vw,19px);
+  line-height:1.6;
+  color:var(--slate);
+  max-width:52ch;
+}
+
+/* ---------- section scaffolding ---------- */
+section{position:relative;padding:clamp(72px,10vw,140px) 0}
+.section-head{
+  display:flex;
+  align-items:baseline;
+  gap:16px;
+  padding-bottom:20px;
+  margin-bottom:clamp(40px,6vw,72px);
+  border-bottom:1px solid var(--rule-strong);
+}
+.section-head .label{flex:0 0 auto}
+.section-head .rule-fill{
+  flex:1 1 auto;
+  height:1px;
+  background:repeating-linear-gradient(90deg,var(--rule) 0 3px,transparent 3px 7px);
+  transform:translateY(-4px);
+}
+@media(max-width:700px){
+  .section-head .label + .rule-fill + .label{display:none}
+}
+
+/* ============================================================
+   NAV
+   ============================================================ */
+.nav{
+  position:sticky;
+  top:0;
+  z-index:50;
+  border-bottom:1px solid transparent;
+  transition:background .35s ease,border-color .35s ease;
+}
+.nav.stuck{
+  background:rgba(14,22,32,.86);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom-color:var(--rule-strong);
+}
+.nav-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  height:72px;
+}
+.brand{display:flex;align-items:center;gap:11px}
+.brand-mark{width:22px;height:22px;flex:0 0 auto}
+.brand-mark .bar{transform-origin:center bottom;animation:pulseBar 2.6s ease-in-out infinite}
+.brand-mark .bar:nth-child(2){animation-delay:.25s}
+.brand-mark .bar:nth-child(3){animation-delay:.5s}
+@keyframes pulseBar{0%,100%{transform:scaleY(.55)}50%{transform:scaleY(1)}}
+.brand-name{font-size:16px;font-weight:600;letter-spacing:-.02em}
+.brand-name em{font-style:normal;color:var(--amber)}
+
+.nav-links{display:none;gap:34px;align-items:center}
+@media(min-width:880px){.nav-links{display:flex}}
+.nav-links a{
+  font-family:var(--mono);font-size:12px;letter-spacing:.08em;
+  color:var(--slate);position:relative;padding:6px 0;
+  transition:color .2s ease;
+}
+.nav-links a::after{
+  content:"";position:absolute;left:0;bottom:0;height:1px;width:100%;
+  background:var(--amber);transform:scaleX(0);transform-origin:right;
+  transition:transform .3s cubic-bezier(.2,.7,.3,1);
+}
+.nav-links a:hover{color:var(--bone)}
+.nav-links a:hover::after{transform:scaleX(1);transform-origin:left}
+
+.nav-cta{
+  display:none;
+  font-family:var(--mono);font-size:12px;letter-spacing:.06em;
+  border:1px solid var(--rule-strong);padding:9px 16px;
+  transition:background .25s ease,color .25s ease,border-color .25s ease;
+}
+@media(min-width:880px){.nav-cta{display:inline-block}}
+.nav-cta:hover{background:var(--amber);color:var(--ink);border-color:var(--amber)}
+
+.burger{
+  display:flex;flex-direction:column;gap:5px;padding:10px;margin-right:-10px;
+}
+@media(min-width:880px){.burger{display:none}}
+.burger span{
+  display:block;width:22px;height:1.5px;background:var(--bone);
+  transition:transform .3s ease,opacity .2s ease;
+}
+.burger[aria-expanded="true"] span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
+.burger[aria-expanded="true"] span:nth-child(2){opacity:0}
+.burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+
+.mobile-menu{
+  display:grid;grid-template-rows:0fr;
+  transition:grid-template-rows .4s cubic-bezier(.2,.7,.3,1);
+  background:var(--ink-2);border-bottom:1px solid transparent;
+}
+.mobile-menu.open{grid-template-rows:1fr;border-bottom-color:var(--rule-strong)}
+.mobile-menu > div{overflow:hidden}
+.mobile-menu nav{display:flex;flex-direction:column;padding:8px 0 24px}
+.mobile-menu nav a{
+  padding:14px 0;border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:var(--slate);
+}
+.mobile-menu .m-cta{
+  margin-top:18px;text-align:center;background:var(--amber);color:var(--ink);
+  padding:14px;font-family:var(--mono);font-size:13px;letter-spacing:.06em;
+  font-weight:600;border-bottom:0;
+}
+
+/* ============================================================
+   HERO — asymmetric, left-anchored, oversized type
+   ============================================================ */
+.hero{padding-top:clamp(48px,7vw,88px);padding-bottom:0}
+.hero-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:clamp(40px,5vw,64px);
+  align-items:end;
+}
+@media(min-width:960px){
+  .hero-grid{grid-template-columns:minmax(0,7fr) minmax(0,4fr);gap:clamp(40px,4vw,80px)}
+}
+
+.hero-status{
+  display:inline-flex;align-items:center;gap:10px;
+  border:1px solid var(--rule-strong);padding:7px 13px;
+  margin-bottom:clamp(28px,4vw,44px);
+}
+.dot{
+  width:6px;height:6px;border-radius:50%;background:var(--amber);
+  flex:0 0 auto;
+  box-shadow:0 0 0 0 rgba(240,162,2,.55);animation:ping 2.2s ease-out infinite;
+}
+@keyframes ping{
+  0%{box-shadow:0 0 0 0 rgba(240,162,2,.5)}
+  70%{box-shadow:0 0 0 8px rgba(240,162,2,0)}
+  100%{box-shadow:0 0 0 0 rgba(240,162,2,0)}
+}
+
+h1 .stroke{
+  -webkit-text-stroke:1.4px var(--slate-2);
+  color:transparent;
+}
+h1 .amber{color:var(--amber)}
+.hero-sub{margin-top:clamp(26px,3.5vw,38px);max-width:46ch}
+
+.hero-cta{
+  margin-top:clamp(30px,4vw,44px);
+  display:inline-flex;align-items:stretch;
+  border:1px solid var(--amber);
+  position:relative;overflow:hidden;
+}
+.hero-cta > span{
+  padding:15px 26px;font-family:var(--mono);font-size:13px;letter-spacing:.08em;
+  font-weight:600;position:relative;z-index:2;transition:color .3s ease;
+}
+.hero-cta .arrow{
+  border-left:1px solid var(--amber);padding:15px 18px;
+  display:flex;align-items:center;transition:color .3s ease,border-color .3s ease;
+}
+.hero-cta::before{
+  content:"";position:absolute;inset:0;background:var(--amber);
+  transform:translateX(-101%);transition:transform .42s cubic-bezier(.2,.7,.3,1);
+}
+.hero-cta:hover::before,.hero-cta:focus-visible::before{transform:translateX(0)}
+.hero-cta:hover > span,.hero-cta:focus-visible > span{color:var(--ink)}
+.hero-cta:hover .arrow{border-left-color:rgba(14,22,32,.3)}
+.hero-cta .arrow svg{transition:transform .42s cubic-bezier(.2,.7,.3,1)}
+.hero-cta:hover .arrow svg{transform:translateX(4px)}
+.hero-note{
+  margin-top:16px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.06em;color:var(--slate-2);
+}
+
+/* --- hero instrument: live waveform --- */
+.instrument{
+  border:1px solid var(--rule-strong);
+  background:linear-gradient(180deg,var(--ink-2),var(--ink));
+}
+.instrument-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 14px;border-bottom:1px solid var(--rule);
+}
+.instrument-bar .label{font-size:10px;letter-spacing:.14em}
+.instrument-body{padding:18px 14px 0}
+.wave-wrap{position:relative;height:110px;overflow:hidden}
+.wave-wrap svg{width:100%;height:100%}
+.wave-grid line{stroke:var(--rule);stroke-width:1}
+.wave-path{
+  fill:none;stroke:var(--amber);stroke-width:1.6;
+  stroke-linejoin:round;stroke-linecap:round;
+}
+.wave-fill{fill:url(#wgrad);opacity:.4}
+.readouts{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  border-top:1px solid var(--rule);margin-top:16px;
+}
+.readout{padding:14px 12px;border-right:1px solid var(--rule)}
+.readout:last-child{border-right:0}
+.readout .k{
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  color:var(--slate-2);text-transform:uppercase;
+}
+.readout .v{
+  font-family:var(--mono);font-size:clamp(16px,2vw,21px);font-weight:600;
+  margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+.readout .v.ok{color:var(--amber)}
+
+/* ============================================================
+   METRIC STRIP (social proof)
+   ============================================================ */
+.proof{padding:0}
+.proof-inner{
+  border-top:1px solid var(--rule-strong);
+  border-bottom:1px solid var(--rule-strong);
+  margin-top:clamp(64px,8vw,110px);
+  padding:clamp(28px,4vw,40px) 0;
+}
+.proof-label{margin-bottom:26px}
+.logo-row{display:grid;grid-template-columns:repeat(2,1fr);gap:2px}
+@media(min-width:640px){.logo-row{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1000px){.logo-row{grid-template-columns:repeat(6,1fr)}}
+.logo-cell{
+  display:flex;align-items:center;justify-content:center;
+  padding:22px 10px;color:var(--slate-2);position:relative;
+  transition:color .3s ease,background .3s ease;
+}
+.logo-cell::after{
+  content:"";position:absolute;left:50%;bottom:0;width:0;height:1px;
+  background:var(--amber);transform:translateX(-50%);
+  transition:width .35s cubic-bezier(.2,.7,.3,1);
+}
+.logo-cell:hover{color:var(--bone);background:var(--ink-2)}
+.logo-cell:hover::after{width:100%}
+.logo-cell svg{height:24px;width:auto}
+
+.stat-strip{
+  display:grid;grid-template-columns:repeat(2,1fr);
+  border-top:1px solid var(--rule);margin-top:clamp(28px,4vw,40px);
+}
+@media(min-width:820px){.stat-strip{grid-template-columns:repeat(4,1fr)}}
+.stat{padding:26px 20px 4px 0;border-right:1px solid var(--rule)}
+.stat:last-child{border-right:0}
+@media(max-width:819px){
+  .stat:nth-child(2n){border-right:0}
+  .stat:nth-child(-n+2){border-bottom:1px solid var(--rule);padding-bottom:24px}
+}
+.stat .n{
+  font-size:clamp(32px,4.4vw,50px);font-weight:600;letter-spacing:-.04em;
+  line-height:1;font-variant-numeric:tabular-nums;
+}
+.stat .n .u{color:var(--amber);font-size:.55em;margin-left:2px}
+.stat .d{margin-top:10px;font-size:13px;color:var(--slate);line-height:1.4;max-width:22ch}
+
+/* ============================================================
+   FEATURES — numbered ledger rows, not shadow cards
+   ============================================================ */
+.feature-list{border-top:1px solid var(--rule-strong)}
+.feature{
+  display:grid;grid-template-columns:1fr;gap:14px;
+  padding:clamp(32px,4.5vw,48px) 0;
+  border-bottom:1px solid var(--rule);
+  position:relative;
+  transition:padding-left .4s cubic-bezier(.2,.7,.3,1);
+}
+@media(min-width:900px){
+  .feature{
+    grid-template-columns:minmax(0,1fr) minmax(0,4fr) minmax(0,5fr) minmax(0,2.4fr);
+    gap:clamp(20px,3vw,44px);
+    align-items:start;
+  }
+  .feature:hover{padding-left:22px}
+}
+.feature::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--amber);transform:scaleY(0);transform-origin:top;
+  transition:transform .45s cubic-bezier(.2,.7,.3,1);
+}
+.feature:hover::before{transform:scaleY(1)}
+.feature .idx{
+  font-family:var(--mono);font-size:12px;letter-spacing:.1em;
+  color:var(--slate-2);padding-top:5px;transition:color .3s ease;
+}
+.feature:hover .idx{color:var(--amber)}
+.feature .copy{font-size:15px;line-height:1.65;color:var(--slate)}
+.feature-viz{
+  border:1px solid var(--rule);padding:12px;background:var(--ink-2);
+  transition:border-color .35s ease;
+}
+.feature:hover .feature-viz{border-color:var(--rule-strong)}
+.feature-viz svg{width:100%;height:auto}
+
+.bars rect{transform-origin:bottom;animation:barGrow 3s ease-in-out infinite}
+@keyframes barGrow{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.feature:hover .bars rect{animation-duration:1.1s}
+.pulse-node{animation:nodeFade 2.4s ease-in-out infinite}
+@keyframes nodeFade{0%,100%{opacity:.25}50%{opacity:1}}
+.trace-line{stroke-dasharray:120;stroke-dashoffset:120;animation:traceRun 2.8s linear infinite}
+@keyframes traceRun{to{stroke-dashoffset:-120}}
+
+/* ============================================================
+   HOW IT WORKS — rail with connecting line
+   ============================================================ */
+.steps{display:grid;grid-template-columns:1fr;position:relative}
+@media(min-width:860px){.steps{grid-template-columns:repeat(4,1fr)}}
+.step{position:relative}
+@media(min-width:860px){
+  .step{
+    padding:44px clamp(16px,2vw,28px) 0;
+    border-right:1px solid var(--rule);
+  }
+  .step:first-child{padding-left:0}
+  .step:last-child{border-right:0;padding-right:0}
+}
+@media(max-width:859px){
+  .step{padding:0 0 38px 34px;border-left:1px solid var(--rule)}
+  .step:last-child{padding-bottom:0;border-left-color:transparent}
+}
+.step-node{
+  position:absolute;width:11px;height:11px;
+  border:1px solid var(--amber);background:var(--ink);
+  transform:rotate(45deg);
+  transition:background .3s ease,transform .4s cubic-bezier(.2,.7,.3,1);
+}
+@media(min-width:860px){
+  .step-node{left:clamp(16px,2vw,28px);top:-6px}
+  .step:first-child .step-node{left:0}
+}
+@media(max-width:859px){.step-node{left:-6px;top:2px}}
+.step:hover .step-node{background:var(--amber);transform:rotate(45deg) scale(1.35)}
+.steps-rail{
+  display:none;position:absolute;left:0;right:0;top:0;height:1px;
+  background:var(--rule-strong);
+}
+@media(min-width:860px){.steps-rail{display:block}}
+.step .st-num{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+  color:var(--amber);display:block;margin-bottom:16px;
+}
+.step h3{margin-bottom:12px}
+.step p{font-size:14.5px;line-height:1.65;color:var(--slate);max-width:32ch}
+.step-cmd{
+  margin-top:16px;font-family:var(--mono);font-size:11.5px;color:var(--slate-2);
+  border:1px solid var(--rule);padding:9px 11px;
+  overflow-x:auto;white-space:nowrap;
+  transition:border-color .3s ease,color .3s ease;
+}
+.step:hover .step-cmd{border-color:var(--rule-strong);color:var(--bone)}
+.step-cmd b{color:var(--amber);font-weight:400}
+
+/* ============================================================
+   PRICING — three columns, no floating shadow cards
+   ============================================================ */
+.tiers{display:grid;grid-template-columns:1fr;border-top:1px solid var(--rule-strong)}
+@media(min-width:900px){.tiers{grid-template-columns:repeat(3,1fr)}}
+.tier{
+  padding:clamp(28px,3.5vw,40px) 0;
+  border-bottom:1px solid var(--rule);
+  position:relative;
+  transition:background .35s ease,transform .4s cubic-bezier(.2,.7,.3,1);
+}
+@media(min-width:900px){
+  .tier{
+    padding:clamp(28px,3vw,40px) clamp(20px,2.4vw,34px);
+    border-right:1px solid var(--rule);border-bottom:0;
+  }
+  .tier:first-child{padding-left:0}
+  .tier:last-child{border-right:0;padding-right:0}
+  .tier:hover{transform:translateY(-8px);background:var(--ink-2)}
+}
+.tier::after{
+  content:"";position:absolute;left:0;right:0;top:-1px;height:2px;
+  background:var(--amber);transform:scaleX(0);transform-origin:left;
+  transition:transform .45s cubic-bezier(.2,.7,.3,1);
+}
+.tier:hover::after,.tier.featured::after{transform:scaleX(1)}
+.tier-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.tier-name{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+.tier-tag{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+  color:var(--amber);border:1px solid var(--amber);padding:3px 7px;white-space:nowrap;
+}
+.price{margin-top:22px;display:flex;align-items:baseline;gap:6px;font-variant-numeric:tabular-nums}
+.price .amt{font-size:clamp(42px,5.2vw,60px);font-weight:600;letter-spacing:-.045em;line-height:1}
+.price .per{font-family:var(--mono);font-size:12px;color:var(--slate-2);letter-spacing:.04em}
+.tier-desc{margin-top:14px;font-size:14px;color:var(--slate);line-height:1.6;max-width:30ch;min-height:44px}
+.tier-btn{
+  display:block;width:100%;text-align:center;margin-top:26px;
+  border:1px solid var(--rule-strong);padding:13px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.08em;
+  transition:background .28s ease,color .28s ease,border-color .28s ease;
+}
+.tier-btn:hover{background:var(--bone);color:var(--ink);border-color:var(--bone)}
+.tier.featured .tier-btn{background:var(--amber);border-color:var(--amber);color:var(--ink);font-weight:600}
+.tier.featured .tier-btn:hover{background:var(--amber-hi);border-color:var(--amber-hi)}
+.tier ul{list-style:none;margin:26px 0 0;padding:0;border-top:1px solid var(--rule)}
+.tier li{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:11px 0;font-size:14px;color:var(--slate);
+  border-bottom:1px solid var(--rule);
+}
+.tier li:last-child{border-bottom:0}
+.tier li .tick{
+  flex:0 0 auto;margin-top:7px;width:5px;height:5px;
+  background:var(--slate-2);transition:background .3s ease;
+}
+.tier:hover li .tick{background:var(--amber)}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer{
+  border-top:1px solid var(--rule-strong);
+  padding:clamp(48px,6vw,80px) 0 32px;
+  position:relative;z-index:2;
+}
+.foot-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px 24px}
+@media(min-width:860px){
+  .foot-grid{grid-template-columns:minmax(0,4fr) repeat(3,minmax(0,2fr));gap:40px}
+}
+.foot-brand{grid-column:1 / -1}
+@media(min-width:860px){.foot-brand{grid-column:auto}}
+.foot-brand p{margin-top:18px;font-size:14px;color:var(--slate);max-width:34ch;line-height:1.65}
+.foot-col h4{
+  margin:0 0 18px;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--slate-2);font-weight:400;
+}
+.foot-col a{
+  display:block;font-size:14px;color:var(--slate);padding:6px 0;
+  transition:color .2s ease,transform .28s cubic-bezier(.2,.7,.3,1);
+}
+.foot-col a:hover{color:var(--amber);transform:translateX(4px)}
+.foot-bottom{
+  margin-top:clamp(44px,6vw,72px);padding-top:22px;border-top:1px solid var(--rule);
+  display:flex;flex-wrap:wrap;gap:14px 26px;align-items:center;justify-content:space-between;
+}
+.foot-bottom .label{font-size:10.5px}
+.foot-status{display:flex;align-items:center;gap:9px}
+
+.wordmark{
+  margin-top:clamp(40px,6vw,72px);
+  font-size:clamp(64px,17.5vw,250px);
+  font-weight:600;letter-spacing:-.055em;line-height:.8;
+  color:transparent;-webkit-text-stroke:1px var(--rule-strong);
+  user-select:none;overflow:hidden;white-space:nowrap;
+}
+
+/* ---------- reveal on scroll ---------- */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.3,1)}
+.reveal.in{opacity:1;transform:none}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+  }
+  .reveal{opacity:1;transform:none}
+}
+
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+</style>
+</head>
+<body>
+
+<div class="grid-substrate" aria-hidden="true">
+  <span></span><span></span><span></span><span></span>
+  <span></span><span></span><span></span><span></span>
+  <span></span><span></span><span></span><span></span>
+</div>
+
+<!-- ===================== NAV ===================== -->
+<header class="nav" id="nav">
+  <div class="shell">
+    <div class="nav-inner">
+      <a class="brand" href="#top">
+        <svg class="brand-mark" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+          <rect class="bar" x="1"  y="4" width="4" height="14" fill="#F0A202"/>
+          <rect class="bar" x="9"  y="4" width="4" height="14" fill="#F2EFE9"/>
+          <rect class="bar" x="17" y="4" width="4" height="14" fill="#5A6472"/>
+        </svg>
+        <span class="brand-name">Nordveil<em>.</em></span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#features">Platform</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#docs">Docs</a>
+      </nav>
+
+      <a class="nav-cta" href="#pricing">Start free trial</a>
+
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="mobileMenu" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <div><div class="shell">
+      <nav aria-label="Mobile">
+        <a href="#features">Platform</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#docs">Docs</a>
+        <a class="m-cta" href="#pricing">Start free trial</a>
+      </nav>
+    </div></div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+  <div class="shell">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-status">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="label">Region eu-north-1 &middot; all systems nominal</span>
+        </div>
+
+        <h1>
+          Know it<br>
+          broke <span class="stroke">before</span><br>
+          <span class="amber">they do.</span>
+        </h1>
+
+        <p class="lead hero-sub">
+          Nordveil is infrastructure monitoring built for engineering teams of
+          10&ndash;150 &mdash; the ones who outgrew a status dashboard but shouldn't
+          need a full-time observability engineer to run one.
+        </p>
+
+        <a class="hero-cta" href="#pricing">
+          <span>Start free trial</span>
+          <span class="arrow" aria-hidden="true">
+            <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M1 5.5h12M9 1.5l4 4-4 4"/>
+            </svg>
+          </span>
+        </a>
+        <p class="hero-note">14 days &middot; no card &middot; agent installs in one line</p>
+      </div>
+
+      <div class="instrument" aria-label="Live latency readout">
+        <div class="instrument-bar">
+          <span class="label"><span class="num">/</span> p99 latency &mdash; api-edge</span>
+          <span class="label" id="clock">--:--:--</span>
+        </div>
+        <div class="instrument-body">
+          <div class="wave-wrap">
+            <svg viewBox="0 0 320 110" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#F0A202" stop-opacity=".55"/>
+                  <stop offset="100%" stop-color="#F0A202" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <g class="wave-grid">
+                <line x1="0" y1="27.5" x2="320" y2="27.5"/>
+                <line x1="0" y1="55"   x2="320" y2="55"/>
+                <line x1="0" y1="82.5" x2="320" y2="82.5"/>
+              </g>
+              <path class="wave-fill" id="waveFill" d=""/>
+              <path class="wave-path" id="wavePath" d=""/>
+            </svg>
+          </div>
+          <div class="readouts">
+            <div class="readout">
+              <div class="k">p99</div>
+              <div class="v ok" id="rP99">&mdash; ms</div>
+            </div>
+            <div class="readout">
+              <div class="k">Error rate</div>
+              <div class="v" id="rErr">&mdash;%</div>
+            </div>
+            <div class="readout">
+              <div class="k">Hosts</div>
+              <div class="v" id="rHosts">&mdash;</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SOCIAL PROOF ===================== -->
+<section class="proof">
+  <div class="shell">
+    <div class="proof-inner reveal">
+      <p class="label proof-label"><span class="num">/01</span> &nbsp;Trusted in production by</p>
+
+      <div class="logo-row">
+        <div class="logo-cell" title="Halberd">
+          <svg viewBox="0 0 120 24" fill="none" role="img" aria-label="Halberd">
+            <path d="M4 20V4M4 12h11M15 20V4" stroke="currentColor" stroke-width="2.2"/>
+            <text x="26" y="17.5" font-family="Helvetica,Arial" font-size="14" font-weight="700" letter-spacing="1" fill="currentColor">HALBERD</text>
+          </svg>
+        </div>
+        <div class="logo-cell" title="Tessel">
+          <svg viewBox="0 0 110 24" fill="none" role="img" aria-label="Tessel">
+            <rect x="3" y="5" width="7" height="7" fill="currentColor"/>
+            <rect x="11" y="13" width="7" height="7" fill="currentColor"/>
+            <text x="26" y="17.5" font-family="Helvetica,Arial" font-size="14" letter-spacing="3" fill="currentColor">TESSEL</text>
+          </svg>
+        </div>
+        <div class="logo-cell" title="Northgate">
+          <svg viewBox="0 0 132 24" fill="none" role="img" aria-label="Northgate">
+            <circle cx="10" cy="12" r="7.2" stroke="currentColor" stroke-width="2.2"/>
+            <circle cx="10" cy="12" r="2.2" fill="currentColor"/>
+            <text x="24" y="17.5" font-family="Georgia,serif" font-size="14.5" font-style="italic" fill="currentColor">Northgate</text>
+          </svg>
+        </div>
+        <div class="logo-cell" title="Kvarn Sys">
+          <svg viewBox="0 0 138 24" fill="none" role="img" aria-label="Kvarn Sys">
+            <path d="M10 3l7 9-7 9-7-9z" stroke="currentColor" stroke-width="2"/>
+            <text x="24" y="17.5" font-family="Helvetica,Arial" font-size="13" font-weight="700" fill="currentColor">KVARN</text>
+            <text x="83" y="17.5" font-family="Helvetica,Arial" font-size="13" font-weight="300" fill="currentColor">SYS</text>
+          </svg>
+        </div>
+        <div class="logo-cell" title="Loomis">
+          <svg viewBox="0 0 112 24" fill="none" role="img" aria-label="Loomis">
+            <path d="M3 4v16h9" stroke="currentColor" stroke-width="2.4"/>
+            <text x="20" y="17.5" font-family="Helvetica,Arial" font-size="14" font-weight="500" letter-spacing="2" fill="currentColor">LOOMIS</text>
+          </svg>
+        </div>
+        <div class="logo-cell" title="Arcweld">
+          <svg viewBox="0 0 122 24" fill="none" role="img" aria-label="Arcweld">
+            <path d="M3 18a9 9 0 0 1 16 0" stroke="currentColor" stroke-width="2.2"/>
+            <circle cx="11" cy="18" r="2" fill="currentColor"/>
+            <text x="26" y="17.5" font-family="Helvetica,Arial" font-size="13.5" font-weight="600" letter-spacing="1.5" fill="currentColor">ARCWELD</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="stat-strip">
+        <div class="stat">
+          <div class="n" data-count="4.2" data-dec="1"><span>0</span><span class="u">min</span></div>
+          <div class="d">Median time to first alert after install</div>
+        </div>
+        <div class="stat">
+          <div class="n" data-count="61" data-suffix="%"><span>0</span></div>
+          <div class="d">Fewer pages per on-call rotation, median</div>
+        </div>
+        <div class="stat">
+          <div class="n" data-count="9.4" data-dec="1"><span>0</span><span class="u">B</span></div>
+          <div class="d">Events ingested per month across the fleet</div>
+        </div>
+        <div class="stat">
+          <div class="n" data-count="99.98" data-dec="2"><span>0</span><span class="u">%</span></div>
+          <div class="d">Ingest availability, trailing twelve months</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FEATURES ===================== -->
+<section id="features">
+  <div class="shell">
+    <div class="section-head reveal">
+      <p class="label"><span class="num">/02</span> &nbsp;Platform</p>
+      <span class="rule-fill"></span>
+      <p class="label">Three things, done properly</p>
+    </div>
+
+    <h2 class="reveal" style="max-width:16ch;margin-bottom:clamp(40px,5vw,64px)">
+      Not another wall<br>of dashboards.
+    </h2>
+
+    <div class="feature-list">
+
+      <article class="feature reveal">
+        <div class="idx">/ 01</div>
+        <h3>Correlated signal,<br>one timeline</h3>
+        <p class="copy">
+          Metrics, logs and traces land on a single time axis with the deploy markers
+          already drawn in. When p99 doubles at 14:07, the commit that shipped at 14:06
+          is sitting right there &mdash; no tab-switching, no manual timestamp math.
+        </p>
+        <div class="feature-viz">
+          <svg viewBox="0 0 160 62" fill="none" aria-hidden="true">
+            <line x1="0" y1="50" x2="160" y2="50" stroke="rgba(242,239,233,.16)"/>
+            <g class="bars">
+              <rect x="6"   y="26" width="7" height="24" fill="#5A6472"/>
+              <rect x="21"  y="18" width="7" height="32" fill="#5A6472"/>
+              <rect x="36"  y="30" width="7" height="20" fill="#5A6472"/>
+              <rect x="51"  y="10" width="7" height="40" fill="#F0A202"/>
+              <rect x="66"  y="22" width="7" height="28" fill="#5A6472"/>
+              <rect x="81"  y="34" width="7" height="16" fill="#5A6472"/>
+              <rect x="96"  y="16" width="7" height="34" fill="#5A6472"/>
+              <rect x="111" y="28" width="7" height="22" fill="#5A6472"/>
+              <rect x="126" y="12" width="7" height="38" fill="#F0A202"/>
+              <rect x="141" y="32" width="7" height="18" fill="#5A6472"/>
+            </g>
+            <line x1="54.5" y1="4" x2="54.5" y2="56" stroke="#F0A202" stroke-width="1" stroke-dasharray="2 3"/>
+            <text x="58" y="10" font-family="monospace" font-size="6" fill="#F0A202">deploy</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="feature reveal">
+        <div class="idx">/ 02</div>
+        <h3>Alerts that<br>earn the page</h3>
+        <p class="copy">
+          Thresholds learn your traffic shape, so Tuesday 3am quiet doesn't read as an
+          outage and Black Friday load doesn't read as normal. Related firing alerts
+          collapse into one incident with a ranked probable cause.
+        </p>
+        <div class="feature-viz">
+          <svg viewBox="0 0 160 62" fill="none" aria-hidden="true">
+            <path d="M0 40C20 40 24 20 40 20C56 20 60 44 78 44C96 44 100 14 120 14C140 14 146 36 160 36"
+                  stroke="rgba(242,239,233,.2)" stroke-width="1.2"/>
+            <path d="M0 40C20 40 24 20 40 20C56 20 60 44 78 44C96 44 100 14 120 14C140 14 146 36 160 36"
+                  class="trace-line" stroke="#F0A202" stroke-width="1.8"/>
+            <circle class="pulse-node" cx="120" cy="14" r="3.4" fill="#F0A202"/>
+            <rect x="108" y="1.5" width="44" height="9" fill="none" stroke="#F0A202" stroke-width=".7"/>
+            <text x="112" y="8.3" font-family="monospace" font-size="5.4" fill="#F0A202">INCIDENT</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="feature reveal">
+        <div class="idx">/ 03</div>
+        <h3>Cost you can<br>actually predict</h3>
+        <p class="copy">
+          Per-host pricing with cardinality included &mdash; no surprise bill because
+          someone tagged a metric with a request ID. Live spend projection sits in the
+          same panel as your ingest volume.
+        </p>
+        <div class="feature-viz">
+          <svg viewBox="0 0 160 62" fill="none" aria-hidden="true">
+            <g stroke="rgba(242,239,233,.14)">
+              <line x1="0" y1="14" x2="160" y2="14"/>
+              <line x1="0" y1="31" x2="160" y2="31"/>
+              <line x1="0" y1="48" x2="160" y2="48"/>
+            </g>
+            <path d="M4 48L38 44L72 39L106 35L140 30L156 28" stroke="#F0A202" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M4 48L38 40L72 26L106 20L140 8L156 5" stroke="#5A6472" stroke-width="1.4" stroke-dasharray="3 3"/>
+            <circle class="pulse-node" cx="156" cy="28" r="3" fill="#F0A202"/>
+            <text x="4" y="60" font-family="monospace" font-size="5.4" fill="#5A6472">nordveil vs. usage-based</text>
+          </svg>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== HOW IT WORKS ===================== -->
+<section id="how">
+  <div class="shell">
+    <div class="section-head reveal">
+      <p class="label"><span class="num">/03</span> &nbsp;How it works</p>
+      <span class="rule-fill"></span>
+      <p class="label">Install to first insight &mdash; one afternoon</p>
+    </div>
+
+    <div class="steps">
+      <span class="steps-rail" aria-hidden="true"></span>
+
+      <div class="step reveal">
+        <span class="step-node" aria-hidden="true"></span>
+        <span class="st-num">STEP 01</span>
+        <h3>Drop in the agent</h3>
+        <p>One binary, one config line. Debian, Alpine, a Kubernetes DaemonSet or bare EC2 &mdash; same install path.</p>
+        <div class="step-cmd">$ <b>curl</b> -sSL nordveil.sh | sh</div>
+      </div>
+
+      <div class="step reveal">
+        <span class="step-node" aria-hidden="true"></span>
+        <span class="st-num">STEP 02</span>
+        <h3>It maps itself</h3>
+        <p>Nordveil walks your service graph, finds the dependencies, and proposes the SLOs it thinks matter.</p>
+        <div class="step-cmd"><b>42</b> services &middot; <b>7</b> SLOs proposed</div>
+      </div>
+
+      <div class="step reveal">
+        <span class="step-node" aria-hidden="true"></span>
+        <span class="st-num">STEP 03</span>
+        <h3>Tune the noise floor</h3>
+        <p>Two weeks of baseline, then approve or reject each proposed alert. Nothing pages until you say so.</p>
+        <div class="step-cmd">baseline <b>14d</b> &middot; ready</div>
+      </div>
+
+      <div class="step reveal">
+        <span class="step-node" aria-hidden="true"></span>
+        <span class="st-num">STEP 04</span>
+        <h3>Go on call calmly</h3>
+        <p>Routing to PagerDuty, Slack or Opsgenie, with the runbook and the last deploy attached to every page.</p>
+        <div class="step-cmd">route &rarr; <b>#oncall-platform</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PRICING ===================== -->
+<section id="pricing">
+  <div class="shell">
+    <div class="section-head reveal">
+      <p class="label"><span class="num">/04</span> &nbsp;Pricing</p>
+      <span class="rule-fill"></span>
+      <p class="label">Per host &middot; billed monthly &middot; cancel anytime</p>
+    </div>
+
+    <h2 class="reveal" style="max-width:14ch;margin-bottom:clamp(40px,5vw,60px)">
+      Priced per host.<br>
+      <span class="stroke">Not per surprise.</span>
+    </h2>
+
+    <div class="tiers">
+      <div class="tier reveal">
+        <div class="tier-top"><span class="tier-name">Signal</span></div>
+        <div class="price"><span class="amt">$18</span><span class="per">/ host / mo</span></div>
+        <p class="tier-desc">For small platform teams running a handful of services in one region.</p>
+        <a class="tier-btn" href="#">Start free trial</a>
+        <ul>
+          <li><i class="tick"></i>Up to 25 hosts</li>
+          <li><i class="tick"></i>15-day metric retention</li>
+          <li><i class="tick"></i>Logs &amp; traces, 30 GB / mo</li>
+          <li><i class="tick"></i>Slack &amp; email routing</li>
+          <li><i class="tick"></i>Community support</li>
+        </ul>
+      </div>
+
+      <div class="tier featured reveal">
+        <div class="tier-top">
+          <span class="tier-name">Fleet</span>
+          <span class="tier-tag">Most teams</span>
+        </div>
+        <div class="price"><span class="amt">$34</span><span class="per">/ host / mo</span></div>
+        <p class="tier-desc">The full platform for teams of 10&ndash;150 with real on-call rotations.</p>
+        <a class="tier-btn" href="#">Start free trial</a>
+        <ul>
+          <li><i class="tick"></i>Unlimited hosts</li>
+          <li><i class="tick"></i>13-month metric retention</li>
+          <li><i class="tick"></i>Logs &amp; traces, 500 GB / mo</li>
+          <li><i class="tick"></i>Adaptive thresholds &amp; incident grouping</li>
+          <li><i class="tick"></i>PagerDuty, Opsgenie, webhooks</li>
+          <li><i class="tick"></i>SSO &amp; audit log</li>
+        </ul>
+      </div>
+
+      <div class="tier reveal">
+        <div class="tier-top">
+          <span class="tier-name">Bastion</span>
+          <span class="tier-tag">Self-host</span>
+        </div>
+        <div class="price"><span class="amt">Talk</span><span class="per">/ annual</span></div>
+        <p class="tier-desc">Run Nordveil inside your own VPC when the data cannot leave.</p>
+        <a class="tier-btn" href="#">Book a walkthrough</a>
+        <ul>
+          <li><i class="tick"></i>Everything in Fleet</li>
+          <li><i class="tick"></i>Self-hosted or private cloud</li>
+          <li><i class="tick"></i>Custom retention &amp; residency</li>
+          <li><i class="tick"></i>SOC 2 Type II &amp; DPA</li>
+          <li><i class="tick"></i>99.99% SLA, named engineer</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ===================== FOOTER ===================== -->
+<footer id="docs">
+  <div class="shell">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#top">
+          <svg class="brand-mark" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+            <rect class="bar" x="1"  y="4" width="4" height="14" fill="#F0A202"/>
+            <rect class="bar" x="9"  y="4" width="4" height="14" fill="#F2EFE9"/>
+            <rect class="bar" x="17" y="4" width="4" height="14" fill="#5A6472"/>
+          </svg>
+          <span class="brand-name">Nordveil<em>.</em></span>
+        </a>
+        <p>Infrastructure monitoring for engineering teams who would rather be shipping. Built in Gothenburg, running everywhere.</p>
+      </div>
+
+      <div class="foot-col">
+        <h4>Product</h4>
+        <a href="#features">Platform</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#">Changelog</a>
+      </div>
+
+      <div class="foot-col">
+        <h4>Developers</h4>
+        <a href="#">Documentation</a>
+        <a href="#">API reference</a>
+        <a href="#">Agent source</a>
+        <a href="#">Status page</a>
+      </div>
+
+      <div class="foot-col">
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Security</a>
+        <a href="#">Careers</a>
+        <a href="#">Contact</a>
+      </div>
+    </div>
+
+    <div class="wordmark" aria-hidden="true">NORDVEIL</div>
+
+    <div class="foot-bottom">
+      <p class="label">&copy; 2026 Nordveil AB &middot; Org. 559-2210</p>
+      <div class="foot-status">
+        <span class="dot" aria-hidden="true"></span>
+        <p class="label">All systems operational</p>
+      </div>
+      <p class="label">Privacy &middot; Terms &middot; DPA</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- nav: stuck state on scroll ---------- */
+  var nav = document.getElementById('nav');
+  var onScroll = function () { nav.classList.toggle('stuck', window.scrollY > 24); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* ---------- mobile menu ---------- */
+  var burger = document.getElementById('burger');
+  var menu = document.getElementById('mobileMenu');
+  burger.addEventListener('click', function () {
+    var open = burger.getAttribute('aria-expanded') === 'true';
+    burger.setAttribute('aria-expanded', String(!open));
+    menu.classList.toggle('open', !open);
+  });
+  menu.addEventListener('click', function (e) {
+    if (e.target.closest('a')) {
+      burger.setAttribute('aria-expanded', 'false');
+      menu.classList.remove('open');
+    }
+  });
+
+  /* ---------- reveal on scroll ---------- */
+  var revealEls = document.querySelectorAll('.reveal');
+  if (reduced || !('IntersectionObserver' in window)) {
+    Array.prototype.forEach.call(revealEls, function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry, i) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        setTimeout(function () { el.classList.add('in'); }, (i % 4) * 70);
+        io.unobserve(el);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    Array.prototype.forEach.call(revealEls, function (el) { io.observe(el); });
+  }
+
+  /* ---------- animated stat counters ---------- */
+  var stats = document.querySelectorAll('.stat .n[data-count]');
+  var runStat = function (el) {
+    var target = parseFloat(el.getAttribute('data-count'));
+    var dec = parseInt(el.getAttribute('data-dec') || '0', 10);
+    var suffix = el.getAttribute('data-suffix') || '';
+    var out = el.firstElementChild;
+    if (reduced) { out.textContent = target.toFixed(dec) + suffix; return; }
+    var start = performance.now(), dur = 1250;
+    var tick = function (now) {
+      var t = Math.min((now - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - t, 3);
+      out.textContent = (target * eased).toFixed(dec) + suffix;
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  if ('IntersectionObserver' in window) {
+    var sio = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { runStat(e.target); sio.unobserve(e.target); }
+      });
+    }, { threshold: 0.5 });
+    Array.prototype.forEach.call(stats, function (el) { sio.observe(el); });
+  } else {
+    Array.prototype.forEach.call(stats, runStat);
+  }
+
+  /* ---------- hero instrument: live waveform ---------- */
+  var pathEl = document.getElementById('wavePath');
+  var fillEl = document.getElementById('waveFill');
+  var rP99 = document.getElementById('rP99');
+  var rErr = document.getElementById('rErr');
+  var rHosts = document.getElementById('rHosts');
+  var clock = document.getElementById('clock');
+
+  var N = 48, W = 320, H = 110, data = [];
+  for (var i = 0; i < N; i++) data.push(0.35 + Math.random() * 0.3);
+
+  var toPath = function (arr, close) {
+    var step = W / (arr.length - 1), d = '';
+    for (var j = 0; j < arr.length; j++) {
+      var x = (j * step).toFixed(2);
+      var y = (H - arr[j] * (H - 12) - 6).toFixed(2);
+      d += (j === 0 ? 'M' : 'L') + x + ' ' + y;
+    }
+    if (close) d += 'L' + W + ' ' + H + 'L0 ' + H + 'Z';
+    return d;
+  };
+
+  var render = function () {
+    pathEl.setAttribute('d', toPath(data, false));
+    fillEl.setAttribute('d', toPath(data, true));
+  };
+
+  var hosts = 1284;
+  var pump = function () {
+    var last = data[data.length - 1];
+    var next = last + (Math.random() - 0.5) * 0.22;
+    if (Math.random() < 0.07) next += 0.3;              // occasional spike
+    next = next * 0.92 + 0.45 * 0.08;                   // pull toward baseline
+    next = Math.max(0.12, Math.min(0.94, next));
+    data.push(next);
+    data.shift();
+    render();
+
+    rP99.textContent = Math.round(38 + next * 190) + ' ms';
+    rErr.textContent = (next * 0.42).toFixed(2) + '%';
+    if (Math.random() < 0.3) hosts += Math.random() < 0.5 ? 1 : -1;
+    rHosts.textContent = hosts.toLocaleString('en-US');
+  };
+
+  var tickClock = function () {
+    var d = new Date();
+    var p = function (n) { return n < 10 ? '0' + n : '' + n; };
+    clock.textContent = p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds()) + 'Z';
+  };
+
+  render();
+  pump();
+  tickClock();
+  if (!reduced) {
+    setInterval(pump, 900);
+    setInterval(tickClock, 1000);
+  }
+
+  /* ---------- smooth anchor scroll ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('a[href^="#"]'), function (a) {
+    a.addEventListener('click', function (e) {
+      var id = a.getAttribute('href');
+      if (id.length < 2) return;
+      var t = document.querySelector(id);
+      if (!t) return;
+      e.preventDefault();
+      t.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    });
+  });
+})();
+</script>
+</body>
+</html>
